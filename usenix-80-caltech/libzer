@@ -1,0 +1,6 @@
+: Shell command to drive libzer.qed
+if $1x != x goto OK
+	echo Usage: libzer library
+	exit
+: OK
+qed -i -q -x /usr/qed/q/libzer.qed $1

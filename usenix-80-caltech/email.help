@@ -1,0 +1,23 @@
+This is the qed pilot email system.
+It has loaded the .mail and .omail files into buffer `a'.
+Buffer `y' contains this listing. Buffer `x' contains the commands.
+Various buffers are used to store the current letter (`b');
+the mail to be put back in ".omail" (`c'); the reply letter (`d');
+and the mail to be archived (`e').
+
+The commands are as follows.
+help	Display this list.
+keep	Move the current letter into buffer to be saved in ".omail"
+next	Move next letter from mail into the current letter buffer.
+old	get old mail from "mbox" and load into buffer `a'.
+p	Print the current letter
+qed	Exit buffer `x' loop to enter normal editor commands.
+quit	Save kept and unread letters in ".omail";
+	add saved letters (buffer `e') in mbox.
+reply	Create a reply to sender of the current letter.
+restart	Clear letter buffers and reload mail.
+save	Save the current letter for archiving.
+saveall	Save whats left in unread mail in mbox.
+send	Send reponse put in buffer `d' to sender.
+	(and optionally save letter and response in mbox).
+summ	Summarize contents of active letter buffers.

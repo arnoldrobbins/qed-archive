@@ -1,0 +1,12 @@
+""Qed
+" the escape-A is a reverse line feed on some terminals
+"
+ob""A"+p
+ons
+zb:G/	\cl/f\cN
+zc:s@$@	/* \cl */@ p
+zf:-/^[a-zA-Z_].*(/
+zg:o?c yf w\cN!com \cf
+zq:/usr/qed/q/
+zr:zL#r z}:\cB\cN ovr b~e \czqrun\cN \cb~\cN b\cz}
+b~Z

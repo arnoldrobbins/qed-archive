@@ -1,0 +1,19 @@
+" Buffer to zero the object files in a library so that the library
+" remains in the correct order without using up disk space.
+" Must be called as 'qed -x libzer libname' to work as it uses the trick
+" that \ Fa is the first argument (!).
+ovr
+!ls -l \Fa
+ba
+0,$d
+<ar t \Fa
+*s/^/cp .junk.o /
+bb a
+.globl NULL
+NULL
+.
+w .junk.s
+!as -o .junk.o .junk.s
+ba>sh -
+!ar r \Fa *.o; ls -l \Fa; rm -f .junk.? *.o
+q
