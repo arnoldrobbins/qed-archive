@@ -1,0 +1,18 @@
+Things in qfile:
+First couple of lines set up the browse register for your TERMinal
+ons: i like x to always print after a change
+registers:
+\zbpat	changes to buffer with file name matching pat
+\zccom	appends /* com */ to current line
+\zf	looks for first previous function declaration; try \zf,/^}/>lpr
+\zg	runs "com" command on current file name
+\zi	increments first number on line
+\zjthg	appends thg to end of line
+\zq	search dir for *.q files
+\zrbuf	runs the named buffer by reading \zqbuf.q and running it
+	takes leading addresses; \zrman for details
+\zs4	repeat previous substitute on 4th thing in line
+	(usually used as u\zs4)
+\zw3
+word	replace 3rd word in line by word
+\zx3	delete third word in line

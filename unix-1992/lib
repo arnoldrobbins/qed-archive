@@ -1,0 +1,5120 @@
+# To unbundle, sh this file
+echo address.c 1>&2
+sed 's/.//' >address.c <<'//GO.SYSIN DD address.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-int *
+-address()
+-{
+-	register int sign, *a;
+-	int opcnt, nextopand, *b;
+-	register c;
+-
+-	nextopand = -1;
+-	sign = 1;
+-	opcnt = 0;
+-	a = dot;
+-	do {
+-		do c = getchar(); while (c==' ' || c=='\t');
+-		if ('0'<=c && c<='9') {
+-			peekc = c;
+-			if (!opcnt)
+-				a = zero;
+-			a += sign*getnum();
+-		} else switch (c) {
+-		case '$':
+-			a = dol;
+-			/* fall through */
+-		case '.':
+-			if (opcnt)
+-				error('a');
+-			break;
+-		case '\'':
+-			c = getchar();
+-			if (opcnt)
+-				error('a');
+-			if(posn(c, bname)<0)
+-				error('k');
+-			a = zero;
+-			c = posn(c, bname);	/* outside loop for efficiency */
+-			do a++; while (a<=dol && names[c]!=(*a|01));
+-			break;
+-		case '?':
+-			sign = -sign;
+-			/* fall through */
+-		case '/':
+-			compile(c);
+-			b = a;
+-			for (;;) {
+-				a += sign;
+-				if (a<zero)
+-					a = dol;
+-				if (a>dol)
+-					a = zero;
+-				if (execute(a))
+-					break;
+-				if (a==b)
+-					error('/');
+-			}
+-			break;
+-		default:
+-			if (nextopand == opcnt) {
+-				a += sign;
+-				if (a<zero || dol<a)
+-					continue;       /* error('$'); */
+-			}
+-			if (c!='+' && c!='-' && c!='^') {
+-				peekc = c;
+-				if (opcnt==0)
+-					a = 0;
+-				return (a);
+-			}
+-			sign = 1;
+-			if (c!='+')
+-				sign = -sign;
+-			nextopand = ++opcnt;
+-			continue;
+-		}
+-		sign = 1;
+-		opcnt++;
+-	} while (zero<=a && a<=dol);
+-	error('$');
+-	/*NOTREACHED*/
+-}
+//GO.SYSIN DD address.c
+echo blkio.c 1>&2
+sed 's/.//' >blkio.c <<'//GO.SYSIN DD blkio.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define BLKSIZE	512
+-#ifdef	BIGTMP
+-#define	MAXBLOCKS	4095
+-#else
+-#define	MAXBLOCKS	255
+-#endif
+-#define	BLMASK		MAXBLOCKS
+-char	ibuff[512];
+-int	iblock = -1;
+-int	oblock = 0;
+-char	obuff[512];
+-int	ooff;		/* offset of next byte in obuff */
+-initio()
+-{
+-	lock++;
+-	iblock = -1;
+-	oblock = 0;
+-	ooff = 0;
+-	unlock();
+-}
+-char *getline(tl, lbuf)
+-	int tl;
+-	char *lbuf;
+-{
+-	register char *bp, *lp;
+-	register int nl;
+-	extern int read();
+-
+-	lp = lbuf;
+-	nl = -((tl<<1) & 0774);
+-	tl = (tl>>8) & BLMASK;
+-	do {
+-		if (nl<=0) {
+-			if (tl==oblock)
+-				bp = obuff;
+-			else {
+-				bp = ibuff;
+-				if (tl!=iblock) {
+-					iblock = -1;	/* signal protection */
+-					blkio(tl, bp, read);
+-					iblock = tl;
+-				}
+-			}
+-			tl++;
+-			bp -= nl;
+-			nl += BLKSIZE;
+-		}
+-		nl--;
+-	} while (*lp++ = *bp++);
+-	return(lbuf);
+-}
+-int putline()
+-{
+-	register char *op, *lp;
+-	register int r;
+-	extern int write();
+-
+-	modified();
+-	lp = linebuf;
+-	r = (oblock<<8) + (ooff>>1);	/* ooff may be 512! */
+-	op = obuff + ooff;
+-	lock++;
+-	do {
+-		if (op >= obuff+BLKSIZE) {
+-			/* delay updating oblock until after blkio succeeds */
+-			blkio(oblock, op=obuff, write);
+-			oblock++;
+-			ooff = 0;
+-		}
+-		if((*op = *lp++) == '\n') {
+-			*op++ = '\0';
+-			linebp = lp;
+-			break;
+-		}
+-	} while (*op++);
+-	ooff = (((op-obuff)+3)&~3);
+-	unlock();
+-	return (r);
+-}
+-blkio(b, buf, iofcn)
+-	char *buf;
+-	int (*iofcn)();
+-{
+-	if (b>=MAXBLOCKS
+-	|| (lseek(tfile, ((long) b) * 512L, 0)<0L)
+-	|| (*iofcn)(tfile, buf, 512) != 512) {
+-		error('T');
+-	}
+-}
+//GO.SYSIN DD blkio.c
+echo com.c 1>&2
+sed 's/.//' >com.c <<'//GO.SYSIN DD com.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define	OUT	10
+-#define	BACKWARD 11
+-#define FORWARD 12
+-char	jumpcs[] = "0123456789o`'";
+-jump()	/* this should be pronounced with a Swedish accent */
+-{
+-	register int i;
+-	register cond;
+-	register c;
+-
+-	if(stackp->type==TTY)
+-		error('y');
+-	c = getchar();
+-	cond = TRUE;
+-	if(c=='t' || c=='f'){
+-		cond = ((c=='t') == truth());
+-		c = getchar();
+-	}
+-	i = posn(c, jumpcs);
+-	if(i==-1){	/* to handle y[tf] without labels for globals */
+-		ungetchar(c);
+-		if(cond){
+-			while((c = getc())!='\n')
+-				if(c==EOF)
+-					return;
+-		}
+-	}
+-	else if(i<=9){
+-		stacktype(BUF);
+-		ungetchar(c);
+-		i = getnum();
+-		stacktype(BUF);		/* we may have popped stack! */
+-		if(cond){
+-			/* getchar will handle problems if off end of buffer */
+-			bbempty = TRUE;
+-			stackp->lineno = i;
+-			stackp->charno = 0;
+-		}
+-	}
+-	else if(i==OUT){
+-		if(cond){
+-			if(stackp==stack)
+-				error('y');
+-			if(stackp->type==GLOB){
+-				--nestlevel;
+-				stackp->globp = "";
+-			}else
+-				popinp();
+-		}
+-	}
+-	else if(i==FORWARD || i==BACKWARD){
+-		stacktype(BUF);
+-		getlabel();	/* must eat label even if not yumping */
+-		stacktype(BUF);
+-		if(cond)
+-			search(i==FORWARD);
+-	}
+-}
+-stacktype(t)
+-{
+-	if(stackp->type != t)
+-		error('y');
+-}
+-getlabel(){
+-	register char *p, c;
+-	p = genbuf;
+-	for(c=getchar(); posn(c," \"\t\n")<0; c=getchar()){
+-		*p++ = c;
+-		*p = '\0';
+-	}
+-	if(p==genbuf)
+-		error('y');
+-}
+-int *looper(a1,a2,str,dir)
+-	register int *a1, *a2;
+-	register char *str;
+-{
+-	register char *p1;
+-	register char *p2;
+-	while(dir ? a1<=a2 : a1>=a2){
+-		p2 = getline(*a1, linebuf);
+-		while(*p2==' ' || *p2=='\t')
+-			p2++;
+-		if(*p2++=='"' && *p2!=' ' && *p2!='\t' && *p2!='\0') {
+-			for(p1=str; *p2 && (*p1 == *p2); p2++)
+-				p1++;
+-			if(*p1==0 && (*p2==0 || *p2==' ' || *p2=='\t'))
+-				return(a1);
+-		}
+-		if(dir)
+-			a1++;
+-		else
+-			--a1;
+-	}
+-	return((int *)0);
+-}
+-search(forward)
+-{
+-	register int *a1;
+-	struct buffer *bufp;
+-	bufp = stackp->bufptr;
+-	if(forward){
+-		if((a1 = looper(bufp->zero + (stackp->lineno + 1),
+-			bufp->dol,genbuf,1))==0){
+-			a1 = looper(bufp->zero + 1,bufp->zero + (stackp->lineno - 1),genbuf,1);
+-		}
+-	}else{
+-		if((a1 = looper(bufp->zero + (stackp->lineno - 1),
+-			bufp->zero + 1,genbuf,0))==0){
+-			a1 = looper(bufp->dol,bufp->zero + stackp->lineno + 1,genbuf,0);
+-		}
+-	}
+-	if(a1){
+-		stackp->lineno = a1 - bufp->zero;
+-		stackp->charno = 0;
+-	}
+-}
+-int pchar;
+-setapp()
+-{
+-	register c;
+-	c=getchar();
+-	if(posn(c, lchars)>=0) {
+-		pchar = c;
+-		c = getchar();
+-	}
+-	if(c==' ' || c=='\t'){
+-		oneline++;
+-		if(c=='\t')
+-			ungetchar(c);
+-	}
+-	else if(c!='\n')
+-		error('x');
+-}
+-#define	LDCHUNK	512
+-append(f, a)
+-int (*f)();
+-int *a;
+-{
+-	register *a1, *a2, *rdot;
+-	int nline, tl;
+-	struct integer { int iint; };
+-	appflag++;
+-	nline = 0;
+-	dot = a;
+-	while ((*f)()==0) {
+-		if (lastdol>=endcore) {
+-			if (sbrk(LDCHUNK*(sizeof *endcore))==(char *)-1)
+-				error('c');
+-			endcore += LDCHUNK;
+-		}
+-		tl = putline();
+-		nline++;
+-		lock++;
+-		++dol;
+-		a1 = ++lastdol;
+-		fixbufs(1);
+-		a2 = a1+1;
+-		rdot = ++dot;
+-		while (a1 > rdot)
+-			*--a2 = *--a1;
+-		*rdot = tl;
+-		unlock();
+-		if(oneline)
+-			break;
+-	}
+-	appflag=0;
+-	oneline=0;
+-	if(pchar) {
+-		a1 = addr1; addr1 = dot;
+-		a2 = addr2; addr2 = dot;
+-		display(pchar);
+-		pchar = 0;
+-		addr1 = a1; addr2 = a2;
+-	}
+-	return(nline);
+-}
+-char bformat = 'p';
+-bcom()
+-{
+-	register dir, n;
+-	register psize;
+-	register *olddot=addr2;	/* for b. */
+-	dir=1;
+-	if((peekc=getchar())!='\n'){	/* really nextchar() */
+-		if (peekc=='-' || peekc=='+' || peekc=='.') {
+-			if(peekc=='-')
+-				dir= -1;
+-			else if(peekc=='.')
+-				dir=0;
+-			getchar();	/* eat peekc */
+-		}
+-		if((n=getnum())>0)
+-			pagesize=n;
+-	}
+-	psize=pagesize;
+-	if(dir==0)
+-		psize/=2;
+-	if(posn(nextchar(), lchars)>=0)
+-		bformat=getchar();
+-	if(dir<=0) {
+-		if((addr1=addr2-(psize-1))<=zero)
+-			addr1=zero+1;
+-		if(dir==0){
+-			display(bformat);
+-			puts("^^^^^");
+-			addr2++;
+-		}
+-	}
+-	if (dir>=0) {
+-		addr1=addr2;
+-		if((addr2+=(psize-1))>dol)
+-			addr2=dol;
+-	}
+-	display(bformat);
+-	if(dir==0)
+-		dot=olddot;
+-}
+-delete()
+-{
+-	register *a1, *a2, *a3;
+-	setdot();
+-	a1 = addr1;
+-	a2 = addr2;
+-	if(a1==zero) {
+-		if(a2!=zero)
+-			*(a1++);
+-		else
+-			return;		/* 0,$d on an empty buffer */
+-	}
+-	*(a2++);
+-	a3 = lastdol;
+-	lock++;
+-	dol -= a2 - a1;
+-	lastdol -= a2 - a1;
+-	fixbufs(a1-a2);
+-	do
+-		*a1++ = *a2++;
+-	while (a2<=a3);
+-	a1 = addr1;
+-	if (a1 > dol)
+-		a1 = dol;
+-	dot = a1;
+-	unlock();
+-	modified();
+-}
+-allnums()
+-{
+-	register int i;
+-	register char *p;
+-	setdot();
+-	for(i=0; i<NBUFS; i++){
+-		p = string[i].str;
+-		if(*p!='\0' && alldigs(p)){
+-			putct(bname[i]);
+-			puts(p);
+-		}
+-	}
+-}
+-numcom(z)
+-{
+-	register n;
+-	register struct string *sp;
+-	register char *l;
+-	char c;
+-	int numeric;
+-	extern char digits[];		/* defined in getchar.c = "0123456789" */
+-
+-	/*
+-	 * Must generate error if attempt is made to do arithmetic on
+-	 * a register which is not numeric; this is done by remembering
+-	 * (via `numeric') whether the initial string was numeric or not.
+-	 */
+-	sp = &string[z];
+-	numeric = alldigs(sp->str);
+-	n = atoi(sp->str);
+-	for(;;){
+-		switch(c=getchar()){
+-		default:
+-			goto Done;
+-		case ':':
+-			n=getsigned();
+-			goto Not_numeric;
+-		case 'a':
+-			n=addr2-zero;
+-			goto Not_numeric;
+-		case 'r':
+-			if(z+1>=NBUFS)
+-				error('z');
+-			n = addr1-zero;
+-			numset(z+1, addr2-zero);
+-			goto Not_numeric;
+-		case 'n':
+-			nonzero();
+-			l = getline(*addr2,linebuf);
+-			do; while(*l++);
+-			n = l - linebuf - 1;
+-			goto Not_numeric;
+-		case 'P':
+-			n = getpid();
+-		Not_numeric:
+-			numeric = TRUE;		/* It's numeric now! */
+-			break;
+-
+-		case 'p':
+-			if(n<0)
+-				putchar('-');
+-			putdn(abs(n));
+-			goto Numeric;
+-		case '+':
+-			n += getsigned();
+-			goto Numeric;
+-		case '-':
+-			n -= getsigned();
+-			goto Numeric;
+-		case '*':
+-			n *= getsigned();
+-			goto Numeric;
+-		case '/':
+-			n /= getsigned();
+-			goto Numeric;
+-		case '%':
+-			n %= getsigned();
+-			goto Numeric;
+-		case '!':
+-			if(posn(c=getchar(), "=><")<0)
+-				error('#');
+-			settruth(condition(n, getsigned(), c, 1));
+-			goto Numeric;
+-		case '<':
+-		case '>':
+-		case '=':
+-			settruth(condition(n, getsigned(), c, 0));
+-		Numeric:
+-			if(numeric == FALSE)
+-				error('#');
+-			break;
+-		}
+-	}
+-  Done:
+-	ungetchar(c);
+-	numset(z, n);
+-}
+-condition(n, m, cond, negate)
+-	register n, m, cond, negate;
+-{
+-	int retval;
+-	if(cond=='=')
+-		retval = (n==m);
+-	else if(cond=='<')
+-		retval = (n<m);
+-	else if(cond=='>')
+-		retval = (n>m);
+-	else
+-		error("!");
+-	return(negate^retval);
+-}
+-numset(z, n)
+-	register z;
+-	register n;
+-{
+-	startstring();
+-	numbuild(n);
+-	setstring(z);
+-}
+-numbuild(n)
+-	register n;
+-{
+-	register i;
+-	if(n<0){
+-		addstring('-');
+-		n = -n;
+-	}
+-	i = n/10;
+-	if(i)
+-		numbuild(i);
+-	addstring(n%10+'0');
+-}
+-strcom(z)
+-{
+-	register char *q;
+-	register n;
+-	int getchar();
+-	register struct string *sp;
+-	int cond, c, negate;
+-	setdot();
+-	sp = &string[z];
+-	if(nextchar()=='#'){
+-		getchar();	/* eat the '#' */
+-		numcom(z);
+-		return;
+-	}
+-	negate=FALSE;
+-	switch(cond=getchar()){
+-	default:
+-		error('x');
+-	case 'p':
+-		puts(sp->str);
+-		break;
+-	case 'l':
+-		putl(sp->str);
+-		break;
+-	case ':':
+-		startstring();
+-		for(;;){
+-			c = getquote("\n", getchar);
+-			if(c=='\n'){
+-				setstring(z);
+-				return;
+-			}
+-			addstring(c&0177);
+-		}
+-	case '\'':
+-		startstring();
+-		dupstring(getname('z'));
+-		setstring(z);
+-		break;
+-	case '.':
+-		nonzero();
+-		startstring();
+-		copystring(getline(*addr2, linebuf));
+-		setstring(z);
+-		break;
+-	case '/':
+-		nonzero();
+-		compile('/');
+-		if(execute(addr2)==0){
+-			clearstring(z);
+-			settruth(FALSE);
+-			return;
+-		}
+-		q = loc1;
+-		startstring();
+-		while(q < loc2)
+-			addstring(*q++);
+-		setstring(z);
+-		settruth(TRUE);
+-		return;
+-	case 's':
+-		substitute(stackp!=&stack[0], z);
+-		return;
+-	case '+':
+-		strinc(z, getsigned());
+-		break;
+-	case '-':
+-		strinc(z, -getsigned());
+-		break;
+-	case 'n':
+-		setcount(sp->len);
+-		break;
+-	case 'e':
+-		startstring();
+-		addstring(lasterr);
+-		setstring(z);
+-		break;
+-	case '(':
+-		n=getsigned();
+-		if(abs(n) > sp->len)
+-			error('[');
+-		if(n>=0){
+-			sp->str += n;
+-			sp->len -= n;
+-		}
+-		else{
+-			sp->str += sp->len+n;
+-			sp->len = -n;
+-		}
+-		break;
+-	case ')':
+-		n=getsigned();
+-		if(abs(n) > sp->len)
+-			error('[');
+-		if(n<0){
+-			sp->str[sp->len+n]='\0';
+-			sp->len += n;
+-		} else if(n==0)
+-			clearstring(z);
+-		else {
+-			sp->str[n]='\0';
+-			sp->len=n;
+-		}
+-		break;
+-	case '[':
+-		cpstr(sp->str, linebuf);
+-		loc2=0;	/* Tell execute that it's already in linebuf */
+-		compile(getchar());
+-		if(execute(0)==0){
+-			settruth(FALSE);
+-			setcount(-1);
+-		} else {
+-			settruth(TRUE);
+-			setcount(loc2-linebuf-1);
+-		}
+-		return;
+-	case 'C':
+-		startstring();
+-		clean(z);
+-		setstring(z);
+-		break;
+-	case '!':
+-		if(posn(cond=getchar(), "=><")<0)
+-			error('x');
+-		negate=TRUE;
+-	case '=':
+-	case '<':
+-	case '>':
+-		settruth(FALSE);
+-		q=sp->str;
+-		for(;;){
+-			c=getchar();
+-			if(c=='\n' && *q==0){
+-				if(cond == '=')
+-					settruth(!negate);
+-				return;
+-			}
+-			if(*q++!=c){
+-				if(cond=='<')
+-					settruth(negate ^ (*--q < c));
+-				else if(cond=='>')
+-					settruth(negate ^ (*--q > c));
+-				while(c!='\n')
+-					c=getchar();
+-				return;
+-			}
+-		}
+-	case '{':
+-		q = genbuf;
+-		while(posn(c=getchar(), "} \t\n")<0 && c!=EOF)
+-			*q++ = c;
+-		*q = '\0';
+-		if((q=getenv(genbuf)) == 0)
+-			clearstring(z);
+-		else{
+-			startstring();
+-			copystring(q);
+-			setstring(z);
+-		}
+-		break;
+-	/* end of switch */
+-	}
+-}
+-strinc(z, n)
+-{
+-	register char *q;
+-	q=string[z].str;
+-	while(*q)
+-		*q++ += n;
+-}
+-locn(ap, aq)
+-	char *ap, *aq;
+-{
+-	register char *p, *q, *lastq;
+-	p=ap;
+-	q=aq;
+-	for(;;){
+-		lastq=q;
+-		while(*p==*q){
+-			if(*p++==0 || *p==0)
+-				return(lastq - aq);
+-			q++;
+-		}
+-		if(*q==0)
+-			return(-1);
+-		p=ap;
+-		q=lastq+1;
+-	}
+-}
+-#define	EMPTY	(TRUE+1)	/* ==> ignore this buf in G/V */
+-ncom(c)
+-{
+-	register struct buffer *bufp;
+-	struct buffer *stop;
+-	register char *f, *lp;
+-	int globflag;
+-
+-	setnoaddr();
+-	syncbuf();
+-	globflag = FALSE;
+-	if(c == 'f')
+-		stop = bufp = curbuf;
+-	else{
+-		bufp = buffer;
+-		stop = buffer+NBUFS-1;
+-		if(c=='G')
+-			globflag = TRUE;
+-	}
+-	do{
+-		lp = linebuf;
+-		f = string[FILE(bufp-buffer)].str;
+-		if(c=='N' && (!bufp->cflag || *f==0))
+-			continue;
+-		if(bufp->dol==bufp->zero && *f=='\0'){
+-			if(globflag)
+-				bufp->gmark = EMPTY;
+-			if(globflag || bufp!=curbuf)
+-				continue;
+-		}
+-		*lp++ = bname[bufp-buffer];
+-		*lp++ = (bufp->cflag) ? '\'' : ' ';
+-		*lp++ = (bufp==curbuf) ? '.' : ' ';
+-		numset(FILEBUF, bufp->dol-bufp->zero);
+-		cpstr(string[FILEBUF].str, lp);
+-		lp += string[FILEBUF].len;
+-		f = string[FILE(bufp-buffer)].str;	/* in case strings got g.c.'d */
+-		if(*f)
+-			*lp++ = '\t';
+-		if(globflag){
+-			cpstr(f, lp);
+-			loc2 = 0;	/* ==> we are about to search for 1st time */
+-			bufp->gmark = execute((int *)0);
+-		} else {
+-			*lp = '\0';
+-			lp = linebuf;
+-			while(*lp)
+-				putchar(*lp++);
+-			putl(f);
+-		}
+-	}while(bufp++!=stop);
+-}
+-allstrs()
+-{
+-	register int i;
+-	char *p;
+-	setdot();
+-	for(i=0; i<NBUFS; i++){
+-		p=string[i].str;
+-		if(*p!=0){
+-			putct(bname[i]);
+-			putl(p);
+-		}
+-	}
+-	putct('P');
+-	putl(string[SAVPAT].str);
+-	putct('R');
+-	putl(string[SAVRHS].str);
+-	if(*string[BROWSE].str) {
+-		putct('B');
+-		putl(string[BROWSE].str);
+-	}
+-}
+-/*
+- *	clean (string) to support zaC
+- *	strips leading and trailing white space from a string
+- *	and replaces interior white space by single blanks
+- */
+-clean(z) {
+-	register char *s;
+-	register char *d;
+-	register char c;
+-	d = genbuf;
+-	for (s = string[z].str; (c = *s) == ' ' || c == '\t'; s++);
+-	while (c = *s++) {
+-		if (c == ' ' || c == '\t') {
+-			*d++ = ' ';
+-			while(*s == ' ' || *s == '\t')
+-				s++;
+-		} else {
+-			*d++ = c;
+-		}
+-	}
+-	while (d > genbuf && d[-1] == ' ')
+-		--d;
+-	*d = 0;
+-	copystring(genbuf);
+-}
+//GO.SYSIN DD com.c
+echo getchar.c 1>&2
+sed 's/.//' >getchar.c <<'//GO.SYSIN DD getchar.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-char digits[] = "0123456789";	/* getnum() & atoi() work even on non-ASCII systems */
+-getnum()
+-{
+-	register n, i;
+-	n=0;
+-	while((i=posn(nextchar(), digits)) >= 0){
+-		getchar();
+-		n = n*10 + i;
+-	}
+-	return(n);
+-}
+-
+-getsigned(){
+-	register sign;
+-	if(nextchar()=='-'){
+-		getchar();
+-		sign = -1;
+-	}
+-	else
+-		sign = 1;
+-	return(getnum()*sign);
+-}
+-
+-atoi(s)
+-	register char *s;
+-{
+-	register n, i;
+-	int sign;
+-
+-	n = 0;
+-	sign = 1;
+-	if(*s == '-'){
+-		sign = -1;
+-		s++;
+-	}
+-	while(*s){
+-		i = posn(*s++, digits);
+-		if(i < 0)
+-			return(sign*n);	/* error handling done elsewhere */
+-		n = n*10 + i;
+-	}
+-	return(sign*n);
+-}
+-
+-alldigs(s)
+-	register char *s;
+-{
+-	if(*s == '-')
+-		s++;
+-	while(*s)
+-		if(posn(*s++, digits) < 0)
+-			return(FALSE);
+-	return(TRUE);
+-}
+-
+-char bname[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~";
+-getname(e)
+-{
+-	int getc();
+-	return(getnm(e, getc));
+-}
+-getaz(e)
+-{
+-	int getchar();
+-	return(getnm(e, getchar));
+-}
+-getnm(e, f)
+-	int (*f)();
+-{
+-	register i;
+-	i = posn((*f)(), bname);
+-	if(i < 0)
+-		error(e);
+-	return(i);
+-}
+-char	special[] = "xgBbBcfFlprzN\"\\'";
+-int	qcount;
+-int	afterq;
+-getchar()
+-{
+-	register c;
+-	register peek;
+-
+-	peek=peekc;
+-	c=getc();
+-	if(tflag && !peek && stackp!= &stack[0]){
+-		if(c==EOF)
+-			puts("[*EOF*]");
+-		else
+-			putchar(c);
+-	}
+-	return(c);
+-}
+-getc()
+-{
+-	register c;
+-	register struct buffer *bufp;
+-	register struct stack *sp;
+-	int *lp;
+-	int numeric;
+-	int delta;
+-	int literal;
+-	int i;
+-	char *p;
+-	static char bufbuf[LBSIZE];
+-
+-	if(c = peekc)	/* assignment = */
+-		peekc = 0;
+-	else if(qcount) {
+-		--qcount;
+-		c = '\\';
+-	} else if(c = afterq)	/* assignment = */
+-		afterq = 0;
+-	else {
+-		for(;;popinp()){
+-			sp=stackp;
+-			switch(sp->type){
+-			case TTY:
+-			case XTTY:
+-				if(cprflag && sp == &stack[0] &&
+-					lastttyc == '\n')
+-					write(2, "*", 1);
+-				c = ttyc();
+-				if(sp != &stack[0] && c == '\n') {
+-					if(stackp->type == TTY)
+-						continue;
+-					else		/* XTTY */
+-						popinp();
+-				}
+-				break;
+-			case GLOB:
+-				if ((c = *stackp->globp++) == 0){
+-					popinp();
+-					c = EOF;
+-				}
+-				break;
+-			case STRING:
+-			case BFILEN:
+-			case PAT:
+-			case RHS:
+-			case BRWS:
+-			case FILEN:
+-				if(string[sp->strname].len < sp->charno){
+-					c=EOF;
+-					continue;
+-				}
+-				c=string[sp->strname].str[sp->charno++];
+-				if(c==0)
+-					continue;
+-				break;
+-			case BUF:
+-				bufp=sp->bufptr;
+-				if(bufp==curbuf)
+-					syncbuf();
+-				lp=bufp->zero+sp->lineno;
+-				if(bbempty){
+-					if(lp>bufp->dol)
+-						continue;
+-					p = getline(*lp, bufbuf);
+-					bbempty = FALSE;
+-					for(i=sp->charno; i-- && *p; p++)
+-						;
+-				}else
+-					p = bufbuf+sp->charno;
+-				sp->charno++;
+-				if((c = *p) == '\0'){
+-					/*
+-					 * Leave the last newline in the buffer out.
+-					 */
+-					bbempty = TRUE;
+-					if(lp>=bufp->dol)
+-						continue;
+-					sp->lineno++;
+-					sp->charno=0;
+-					c='\n';
+-				}
+-			}
+-			break;
+-		}
+-		literal = FALSE;
+-		if(c == '\\' && !stackp->literal){
+-		Getc:
+-			c = getc();
+-			i = posn(c, cspec);
+-			switch(i) {
+-			case LITERAL:
+-				if(posn(peekc=getc(), "bfFlprz!") >= 0)
+-					literal = TRUE;
+-				goto Getc;	/* business as usual... */
+-			case QUOTE:
+-				c = '\\';
+-				break;
+-			case NEWL:
+-				c = '\n';
+-				break;
+-			case STRING:
+-				delta = 0;
+-				numeric = 0;
+-				c = getc();
+-				if(c == '#'){
+-					numeric++;
+-					c = getc();
+-				}
+-				if(c == '+' || c == '-'){
+-					delta = 1;
+-					if(c == '-')
+-						delta = -delta;
+-					c=getc();
+-				}
+-				ungetchar(c);
+-				c = getname('z');
+-				if(delta){
+-					if(numeric){
+-						if(!alldigs(string[c].str))
+-							error('#');
+-						numset(c, atoi(string[c].str)+delta);
+-					} else
+-						strinc(c, delta);
+-				}
+-				pushinp(i, c, literal);
+-				literal = FALSE;
+-				c=getc();
+-				break;
+-			case BUF:
+-			case BFILEN:
+-				c = getname(cspec[i]);
+-				if(i == BUF)
+-					bbempty = TRUE;
+-				/* fall through */
+-			case TTY:
+-			case FILEN:
+-			case PAT:
+-			case RHS:
+-				pushinp(i, c, literal);
+-				literal = FALSE;
+-				/* fall through */
+-			case NOTHING:
+-				c = getc();
+-				break;
+-			case CURBN:
+-				c = bname[curbuf-buffer];
+-				break;
+-			case BACKSLASH:
+-				qcount++;
+-				break;
+-			default:
+-				afterq = c;
+-				c = '\\';
+-				break;
+-			}
+-		}
+-	}
+-	lastc = c;
+-	return(c);
+-}
+-ttyc()
+-{
+-	char c;
+-	initflag = 0;
+-	if(read(0, &c, 1) > 0)
+-		lastttyc = c&0177;
+-	else
+-		lastttyc = EOF;
+-	return(lastttyc);
+-}
+-posn(c, s)
+-	register char c;
+-	register char *s;
+-{
+-	register char *is;
+-	is = s;
+-	while(*s)
+-		if(c == *s++)
+-			return(s - is - 1);
+-	return(-1);
+-}
+-pushinp(type, arg, literal)
+-	register arg;
+-{
+-	register struct stack *s;
+-
+-	s = ++stackp;
+-	if(s == stack+STACKSIZE)
+-		error('l');
+-	stackp->literal = literal;
+-	if(tflag){
+-		putchar('[');
+-		if(literal)
+-			putchar('\'');
+-		putchar(cspec[type]);
+-	}
+-	s->type=type;
+-	s->charno = 0;
+-	switch(type){
+-	case BFILEN:
+-		s->strname = FILE(arg);
+-		break;
+-	case STRING:
+-		s->strname = arg;
+-		break;
+-	case FILEN:
+-		s->strname = savedfile;
+-		break;
+-	case PAT:
+-		s->strname = SAVPAT;
+-		break;
+-	case RHS:
+-		s->strname = SAVRHS;
+-		break;
+-	case BRWS:
+-		s->strname = BROWSE;
+-		break;
+-	case BUF:
+-		if((s->bufptr=buffer+arg) == curbuf && appflag)
+-			error('\\');
+-		s->lineno=1;
+-		break;
+-	case GLOB:
+-		s->globp = (char *)arg;
+-		break;
+-	}
+-	if(tflag){
+-		if(type==BFILEN || type==STRING || type==BUF)
+-			putchar(bname[arg]);
+-		putchar('=');
+-	}
+-}
+-popinp(){
+-	if(stackp->type == BUF)
+-		bbempty = TRUE;
+-	if(tflag){
+-		putchar(']');
+-		flush();
+-	}
+-	--stackp;
+-}
+-gettty()
+-{
+-	register c, gf;
+-	register char *p;
+-	p = linebuf;
+-	gf = stackp->type;
+-	while((c=getchar()) != '\n') {
+-		if (c==EOF) {
+-			if (gf == GLOB)
+-				peekc=c;
+-			return(c);
+-		}
+-		if (c == 0)
+-			continue;
+-		*p++ = c;
+-		if (p >= &linebuf[LBSIZE-2])
+-			error('l');
+-	}
+-	*p++ = 0;
+-	if (!oneline && linebuf[0]=='.' && linebuf[1]==0)
+-		return(EOF);
+-	return(0);
+-}
+-getquote(p, f)
+-	register char *p;
+-	int (*f)();
+-{
+-	register c;
+-	c = (*f)();
+-	if(c == '\\') {
+-		if(peekc == 0)
+-			nextchar();	/* prime peekc */
+-		if(posn(peekc, p) >= 0) {
+-			c = peekc | 0200;
+-			(*f)();		/* clear peekc */
+-		}
+-	}
+-	return(c);
+-}
+//GO.SYSIN DD getchar.c
+echo getfile.c 1>&2
+sed 's/.//' >getfile.c <<'//GO.SYSIN DD getfile.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-char	*nextip;
+-long	count;
+-/*
+- * newfile: read a new file name (if given) from command line.
+- *
+- *	nullerr: if true, error if file is null.
+- *	savspec: decides if string[savedfile] is set.
+- *		If savspec==SAVEIFFIRST, only save if deffile is null.
+- *	deffile: default file name.
+- *
+- *	return value: string[FILEBUF]!=deffile
+- *		      (unless SAVEIFFIRST && deffile null ==> return FALSE)
+- *	side effects:
+- *		can set string[savedfile]
+- *		always sets string[FILEBUF]
+- *		zeroes count
+- */
+-newfile(nullerr, savspec, deffile)
+-	char *deffile;
+-{
+-	register char c;
+-
+-	count = 0L;
+-	cpstr(deffile, genbuf);	/* in case we strcompact() */
+-	startstring();
+-	c = getchar();
+-	if(c == '\n')
+-		copystring(genbuf);
+-	else {
+-		if(c != ' ')
+-			error('f');
+-		do  c = getchar();  while(c == ' ');
+-		while(posn(c, " \t\n") < 0){
+-			if(c<' ' || c=='\177')
+-				error('f');
+-			addstring(c);
+-			c = getchar();
+-		}
+-	}
+-	setstring(FILEBUF);
+-	if(nullerr && string[FILEBUF].str[0]=='\0')
+-		error('f');
+-	if(savspec==SAVEALWAYS || (savspec==SAVEIFFIRST && genbuf[0]=='\0')){
+-		startstring();
+-		dupstring(FILEBUF);
+-		setstring(savedfile);
+-		if(savspec==SAVEIFFIRST && genbuf[0]=='\0')
+-			return(FALSE);
+-	}
+-	return(!eqstr(genbuf, string[FILEBUF].str));
+-}
+-exfile()
+-{
+-	close(io);
+-	io = -1;
+-	if (vflag && initflag)
+-		ncom('f');
+-	else if (vflag) {
+-		putlong(count);
+-		putchar('\n');
+-	}
+-	setcount((int)count);
+-}
+-getfile()
+-{
+-	register c;
+-	register char *lp, *fp;
+-	lp = linebuf;
+-	fp = nextip;
+-	do {
+-		if (--ninbuf < 0) {
+-			if ((ninbuf = read(io, genbuf, LBSIZE)-1) < 0) {
+-				if(ninbuf < -1)
+-					error('r');
+-				if(lp != linebuf)
+-					error('N');
+-				return(EOF);
+-			}
+-			fp = genbuf;
+-		}
+-		if (lp >= &linebuf[LBSIZE])
+-			error('l');
+-		if ((*lp++ = c = *fp++ ) == 0) {
+-			lp--;
+-			continue;
+-		}
+-		count++;
+-	} while (c != '\n');
+-	*--lp = 0;
+-	nextip = fp;
+-	return(0);
+-}
+-putfile()
+-{
+-	int *a1;
+-	register char *fp, *lp;
+-	register nib;
+-	nib = 512;
+-	fp = genbuf;
+-	a1 = addr1;
+-	if(a1 == zero)
+-		*a1++;
+-	while(a1 <= addr2){
+-		lp = getline(*a1++, linebuf);
+-		for(;;){
+-			if (--nib < 0) {
+-				if(write(io, genbuf, fp-genbuf) < 0)
+-					error('w');
+-				nib = 511;
+-				fp = genbuf;
+-			}
+-			count++;
+-			if ((*fp++ = *lp++) == 0) {
+-				fp[-1] = '\n';
+-				break;
+-			}
+-		}
+-	}
+-	write(io, genbuf, fp-genbuf);
+-}
+-#define SIGHUP	1
+-#define SIGINTR	2
+-#define SIGQUIT	3
+-#define	SIGBPIPE 13
+-int savint= -1;	/* awful; this is known in error() */
+-Unix(type)
+-	char type;
+-{
+-	register pid, rpid;
+-	register char *s;
+-	int *a, c;
+-	int getsvc();
+-	int onbpipe;
+-	int retcode;
+-	char unixbuf[512];
+-	int	pipe1[2];
+-	int	pipe2[2];
+-	int	*a1, *a2, *ndot;
+-	startstring();	/* for the \zU register */
+-	if(type == '!')
+-		setnoaddr();
+-	else {
+-		if(type == '>' || type == '|')
+-			nonzero();
+-		count = 0L;
+-		if(pipe(pipe1) == -1){
+-			lastc = '\n';
+-			error('|');
+-		}
+-	}
+-	/* Quick hack: if char is doubled, push \'zU */
+-	if(nextchar()==type){
+-		getchar();	/* throw it away */
+-		pushinp(STRING, UNIX, TRUE);
+-	}
+-	/*
+-	 * Use c not *s as EOF and getchar() are int's
+-	 */
+-	for(s=unixbuf;(c=getquote("\n", getsvc))!='\n' && c!=EOF;*s++=(c&0177)){
+-		if(s>=unixbuf+512)
+-			error('l');
+-	}
+-	dropstring();	/* drop the newline */
+-	setstring(UNIX);
+-	*s='\0';
+-	a1 = addr1;
+-	a2 = addr2;
+-	if ((pid = fork()) == 0) {
+-		signal(SIGHUP, onhup);
+-		signal(SIGINTR, onintr);
+-		signal(SIGQUIT, onquit);
+-		if(type=='<' || type=='|'){
+-			close(1);
+-			dup(pipe1[1]);
+-		}else if(type == '>'){
+-			close(0);
+-			dup(pipe1[0]);
+-		}
+-		if (type != '!') {
+-			close(pipe1[0]);
+-			close(pipe1[1]);
+-		}
+-		if(type == '|'){
+-			if(pipe(pipe2) == -1){
+-				puts("?|");
+-				exit(1);
+-			}
+-			if((pid=fork()) == 0){
+-				close(1);
+-				dup(pipe2[1]);
+-				close(pipe2[0]);
+-				close(pipe2[1]);
+-				/*
+-				 * It's ok if we get SIGBPIPE here
+-				 */
+-				display('p');
+-				exit(0);
+-			}
+-			if(pid == -1){
+-				puts("Can't fork\n?!");
+-				exit(1);
+-			}
+-			close(0);
+-			dup(pipe2[0]);
+-			close(pipe2[0]);
+-			close(pipe2[1]);
+-		}
+-		execl("/bin/sh", "sh", "-c", unixbuf, 0);
+-		exit(-1);
+-	}
+-	if(pid == -1){
+-		puts("Can't fork");
+-		error('!');
+-	}
+-	savint = signal(SIGINTR, 1);
+-	if(type=='<' || type=='|') {
+-		close(pipe1[1]);
+-		io = pipe1[0];
+-		ninbuf = 0;
+-		append(getfile,addr2);
+-		close(io);
+-		io = -1;
+-		ndot = dot;
+-	} else if(type == '>') {
+-		onbpipe = signal(SIGBPIPE, 1);
+-		close(pipe1[0]);
+-		a=addr1;
+-		do{
+-			s=getline(*a++, linebuf);
+-			do; while(*s++);
+-			*--s='\n';
+-			if (write(pipe1[1],linebuf,s-(linebuf-1))<0){
+-				puts("?o");
+-				break;
+-			}
+-		}while (a<=addr2);
+-		close(pipe1[1]);
+-		signal(SIGBPIPE, onbpipe);
+-	}
+-	while ((rpid = wait(&retcode)) != pid && rpid != -1);
+-	retcode = (retcode>>8)&0377;
+-	settruth(retcode);
+-	signal(SIGINTR, savint);
+-	if(type == '|'){
+-		if(retcode == 0){
+-			addr1 = a1;
+-			addr2 = a2;
+-			delete();
+-			dot = ndot - (a2-a1+1);
+-		} else
+-			error('0');
+-	}
+-	if(vflag)
+-		puts("!");
+-}
+//GO.SYSIN DD getfile.c
+echo glob.c 1>&2
+sed 's/.//' >glob.c <<'//GO.SYSIN DD glob.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define	ALWAYS	2
+-#define GBSIZE	256
+-until(nfl, n)
+-{
+-	register c, type;
+-	char ubuf[GBSIZE];
+-
+-	c = getchar();
+-	type=posn(c, "ft ");
+-	if(type < 0){
+-		if(nfl==0)
+-			error('x');
+-		ungetchar(c);
+-	}
+-	getglob(ubuf);
+-	settruth(FALSE);
+-	if(nfl && n<=0)
+-		return;	/* do it zero times */
+-	do ; while (exglob(ubuf, ubuf) &&
+-		   !((nfl && --n==0) || 
+-		     (type != ALWAYS && type == truth())));
+-}
+-global(k)
+-{
+-	register int *a1;
+-	char globuf[GBSIZE];
+-	struct buffer *startbuf;
+-
+-	if(gflag++)
+-		error('g');
+-	setall();
+-	if(nextchar() == '\n')
+-		error('x');
+-	compile(getchar());
+-	getglob(globuf);
+-	for (a1=zero; ++a1<=dol;) {
+-		*a1 &= ~01;
+-		if (a1>=addr1 && a1<=addr2 && execute(a1)==k)
+-			*a1 |= 01;
+-	}
+-	startbuf = curbuf;
+-	for (a1=zero; ++a1<=dol; ) {
+-		if (*a1 & 01) {
+-			*a1 &= ~01;
+-			dot = a1;
+-			if (!exglob(globuf, "p"))
+-				break;
+-			chngbuf(startbuf-buffer);
+-			a1 = zero;
+-		}
+-	}
+-	chngbuf(startbuf-buffer);
+-	gflag=FALSE;
+-}
+-
+-globuf(k)
+-{
+-	register struct buffer *bp;
+-	char globbuf[GBSIZE];
+-
+-	if (biggflag++)
+-		error('G');
+-	if (nextchar() =='\n')
+-		error('x');
+-	compile(getchar());
+-	getglob(globbuf);
+-	for (bp=buffer; bp < &buffer[NBUFS]; bp++)
+-		bp->gmark = FALSE;
+-	ncom('G');	/* mark interesting buffers */
+-	for (bp=buffer; bp < &buffer[NBUFS]; bp++)
+-		if (bp->gmark == k) {
+-			chngbuf(bp-buffer);
+-			if (!exglob(globbuf, "f\n"))
+-				break;
+-		}
+-	biggflag = FALSE;
+-}
+-
+-getglob(globuf)
+-	char globuf[];
+-{
+-	register char *gp;
+-	register c;
+-	int getchar();
+-	gp = globuf;
+-	while ((c = getquote("\n", getchar)) != '\n') {
+-		if (c==EOF)
+-			error('x');
+-		*gp++ = c & 0177;
+-		if (gp >= &globuf[GBSIZE-2])
+-			error('l');
+-	}
+-	*gp++ = '\n';
+-	*gp++ = 0;
+-}
+-
+-exglob(cmd, dflt)
+-	char *cmd, *dflt;
+-{
+-	register int nesting;
+-
+-	pushinp(GLOB, eqstr(cmd,"\n")? dflt : cmd, FALSE);
+-	nesting = ++nestlevel;
+-	commands();
+-	if (nesting!=nestlevel)
+-		return(FALSE);
+-	nestlevel--;
+-	return(TRUE);
+-}
+//GO.SYSIN DD glob.c
+echo main.c 1>&2
+sed 's/.//' >main.c <<'//GO.SYSIN DD main.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define SIGHUP	1
+-#define SIGINTR	2
+-#define SIGQUIT	3
+-#define	UP	1
+-#define DOWN	0
+-char lchars[]="pPlL";
+-struct buffer *curbuf = buffer;
+-char	*linp = line;
+-int	appflag = 0;
+-int	pagesize = PAGESIZE;
+-int	prflag = 0;	/* prflag==1 ==> much code to get it right. use the startup buffer */
+-int	lastttyc = '\n';
+-int	gflag = 0;
+-int	tflag = 0;
+-int	vflag = 0;	/* initialization code turns it on */
+-int	uflag = 's';
+-int	dflag = 0;
+-int	initflag = 1;
+-int	*option[] = {
+-	&cflag,	&dflag,	&eflag,	&iflag,	&prflag,&tflag,	&vflag,
+-};
+-char	opcs[] = "cdeipTv";
+-int	tfile = -1;
+-struct	sgttyb ttybuf = { 0, 0, '\b', '\b', /*0*/};
+-char	QEDFILE[]="QEDFILE";
+-int	(*pending)();
+-
+-rescue()
+-{
+-	/* Save in qed.hup:[ab]q on hangup */
+-	signal(SIGHUP,1);
+-	if (lock) {
+-		pending = rescue;
+-		return;
+-	}
+-	startstring();
+-	copystring("qed.hup");
+-	setstring(FILEBUF);
+-	savall();
+-	exit(SIGHUP);
+-}
+-char *filea()
+-{
+-	register struct string *sp;
+-	register int i, d;
+-	char c;
+-
+-	sp = &string[FILEBUF];
+-	startstring();
+-	d = 0;
+-	i = 0;
+-	while((c=sp->str[i]) != '\0'){
+-		addstring(c);
+-		i++;
+-		if(c == '/')
+-			d = i;
+-	}
+-	if((i-d) > 12)		/* file name is >= 13 characters long */
+-		string[NSTRING].str -= (i-(d+12));	/* truncate string */
+-	copystring(":aq");
+-	setstring(FILEBUF);
+-	return(sp->str);
+-}
+-
+-char *fileb()
+-{
+-	register struct string *sp;
+-
+-	sp = &string[FILEBUF];
+-	sp->str[sp->len-2] = 'b';
+-	return(sp->str);
+-}
+-savall()
+-{
+-	register fi;
+-
+-	syncbuf();
+-	addr1 = buffer[0].zero + 1;
+-	addr2 = buffer[NBUFS-1].dol;
+-	if(addr1 > addr2){
+-		error('$');
+-		return;
+-	}
+-	if((io = creat(filea(), 0644)) < 0)
+-		error('o'|FILERR);
+-	putfile();
+-	exfile();
+-	if((fi = creat(fileb(), 0644)) < 0)
+-		error('o'|FILERR);
+-	write(fi, (char *)buffer, sizeof buffer);
+-	write(fi, strarea, sizeof strarea);
+-	lock++;
+-	shiftstring(DOWN);
+-	write(fi, (char *)string, sizeof string);
+-	shiftstring(UP);
+-	unlock();
+-	close(fi);
+-}
+-restor()
+-{
+-	register i, t;
+-	register struct buffer *b;
+-	int fi;
+-	int getfile();
+-	curbuf = buffer;
+-	i = (int)curbuf->zero;
+-	if((t = open(filea(), 0)) < 0){
+-		lastc = '\n';
+-		error('o'|FILERR);
+-	}
+-	initio();
+-	init();
+-	io = t;
+-	ninbuf = 0;
+-	append(getfile, dol);
+-	exfile();
+-	if((fi = open(fileb(),0)) < 0)
+-		error('o'|FILERR);
+-	lock++;
+-	if(read(fi,(char *)buffer,sizeof buffer) != sizeof buffer
+-		|| read(fi, strarea, sizeof strarea) != sizeof strarea
+-		|| read(fi, (char *)string, sizeof string) != sizeof string)
+-		error('R');
+-	close(fi);
+-	shiftstring(UP);
+-	/*
+-	 * This code is incredibly sleazy and machine dependent for the 11.
+-	 * Sorry. There is no good reason why we don't have a shiftbuf():
+-	 * feel free to write one (but lock before you call it!).
+-	 */
+-	t = (int)buffer[0].zero;
+-	if(i != t){
+-		i -= t;
+-		i >>= 1;
+-		for(b = buffer;b <= &buffer[NBUFS-1];b++){
+-			b->zero += i;
+-			b->dot += i;
+-			b->dol += i;
+-		}
+-	}
+-	newbuf(0);
+-	error(0);	/* ==> error, but don't print anything. calls unlock() */
+-}
+-
+-/*
+- *	On INTR, generate error '?'
+- */
+-
+-interrupt()
+-{
+-	signal(SIGINTR, interrupt);
+-	if (lock) {
+-		pending = interrupt;
+-		return;
+-	}
+-	if(iflag){
+-		unlink(tfname);
+-		exit(SIGINTR);
+-	}
+-	linp=line;
+-	putchar('\n');
+-	lastc = '\n';
+-	error('?');
+-}
+-
+-/*
+- * Unlock: exit a critical section, invoking any pending signal routines.
+- */
+-
+-unlock()
+-{
+-	register (*p)();
+-
+-	p = pending;
+-	pending = 0;
+-	lock = 0;
+-	if (p)
+-		(*p)();
+-}
+-
+-char cleanup[] = "ba z~:\n";
+-char setvflag[] = "ov?";
+-char boot1[] = "G/^[";
+-char boot2[] = "].+\t./r\n";
+-
+-main(argc, argv)
+-char **argv;
+-{
+-	register char *p1;
+-	register i;
+-	char buf;
+-	int rvflag;
+-	char *startup=(char *)0;
+-
+-	argv++;
+-	onquit = signal(SIGQUIT, 1);
+-	onhup = signal(SIGHUP, 1);
+-	onintr = signal(SIGINTR, 1);
+-	rvflag = 1;
+-	for(i=0;i!=NSTRING;i++){
+-		string[i].str = nullstr;
+-		string[i].len=0;
+-	}
+-	/* initialize strfree */
+-	string[NSTRING].str = strchars;
+-	while(argc > 1 && **argv=='-'){
+-		switch(argv[0][1]){
+-		casedefault:
+-		default:
+-			rvflag = 0;
+-			break;
+-		case 'q':
+-		/* allow debugging quits? */
+-			signal(SIGQUIT, 0);
+-			break;
+-		case 'i':
+-		/* allow interrupt quits? */
+-			iflag++;
+-			break;
+-		case 'e':
+-		/* Exit on error? */
+-			eflag++;
+-			break;
+-		case 'x':
+-			if(argc == 2)
+-				goto casedefault;
+-			startup = argv[1];
+-			argv++;
+-			--argc;
+-		}
+-		argv++;
+-		--argc;
+-	}
+-	gtty(0,&ttybuf);
+-	if(startup==0)
+-		startup = getenv(QEDFILE);
+-	fendcore = (int *)sbrk(0);
+-	curbuf = &buffer[0];
+-	init();
+-	if (onhup != 1)
+-		signal(SIGHUP, rescue);
+-	if (onintr != 1)
+-		signal(SIGINTR, interrupt);
+-	/*
+-	 * Build the initialization code in register z~
+-	 */
+-	if(startup){
+-		startstring();
+-		copystring(startup);
+-		setstring(FILE(NBUFS-1));
+-		p1 = "b~ r\n\\b~\n";
+-	} else
+-		p1 = "";
+-	startstring();
+-	copystring(p1);
+-	setvflag[2] = "rs"[rvflag];
+-	copystring(setvflag);
+-	/*
+-	 * z~ now has startup-buffer initialization; prepare the file list
+-	 * and generate a GLOBUF to read them in
+-	 */
+-	if(--argc > 0) {
+-		if(argc >= 53)	/* buffer names a-zA-Z */
+-			puts("?i");
+-		else {
+-			copystring(boot1);
+-			for(i=0; i<argc; i++)	/* argument files only */
+-				addstring(bname[i]);
+-			copystring(boot2);
+-			copystring(cleanup);
+-			setstring(NBUFS-1);
+-			buf = 0;
+-			while(argc > 0) {
+-				startstring();
+-				copystring(*argv);
+-				setstring(FILE(buf++));
+-				--argc;
+-				argv++;
+-			}
+-		}
+-	}
+-	else{
+-		copystring(cleanup);
+-		setstring(NBUFS-1);
+-	}
+-	pushinp(STRING, NBUFS-1, FALSE);
+-	setexit();
+-	lastttyc = '\n';
+-	commands();
+-	unlink(tfname);
+-	exit(lasterr);
+-}
+-
+-int	noaddr;
+-commands()
+-{
+-	register int *a;
+-	register c, lastsep;
+-	int getfile(), gettty();
+-	int r;
+-	int changed;
+-	long locn, lseek();
+-	int startline;
+-
+-	for (;;) {
+-	startline = (lastttyc == '\n' && peekc == 0);
+-	cprflag=prflag;
+-	c = '\n';
+-	for (addr1=0;;) {
+-		lastsep = c;
+-		a=address();
+-		c=getchar();
+-		if (c!=',' && c!=';')
+-			break;
+-		if (lastsep==',')
+-			error('a');
+-		if (a==0) {
+-			a = zero+1;
+-			if (a>dol)
+-				--a;
+-		}
+-		addr1 = a;
+-		if (c==';')
+-			dot = a;
+-	}
+-	if (lastsep!='\n' && a==0)
+-		a=dol;
+-	if((addr2=a) == 0) {
+-		addr2=dot;
+-		noaddr = TRUE;
+-	} else
+-		noaddr = FALSE;
+-
+-	if(addr1 == 0)
+-		addr1 = addr2;
+-
+-	cprflag=FALSE;
+-	switch(c){
+-	case 'a':
+-		setdot();
+-		setapp();
+-		append(gettty, addr2);
+-		continue;
+-	case 'b':
+-		if(posn((c=nextchar()), bname)<0){	/* browse command */
+-			setdot();
+-			nonzero();
+-			bcom();
+-			continue;
+-		}
+-		c = getaz('b');
+-		setnoaddr();
+-		chngbuf(c);
+-		continue;
+-	case 'c':
+-		setdot();
+-		nonzero();
+-		setapp();
+-		append(gettty, addr2);
+-		a = dot-(addr2-addr1+1);
+-		delete();
+-		dot = a;
+-		continue;
+-	case 'd':
+-		if(posn(nextchar(),"\377\npPlL \t") < 0)
+-			error('x');
+-		delete();
+-		continue;
+-	case 'E':
+-	case 'e':
+-		setnoaddr();
+-		if(c=='e' && !eok && cflag){
+-			eok=TRUE;
+-			error('e');
+-		}
+-		newfile(TRUE, SAVEALWAYS, "");
+-		delall();
+-		addr1 = zero;
+-		addr2 = zero;
+-		modified();	/* In case file open causes error */
+-		goto caseread;
+-	case 'f':
+-		setnoaddr();
+-		if((c = getchar()) != '\n'){
+-			ungetchar(c);
+-			if(newfile(FALSE, SAVEALWAYS, string[savedfile].str))
+-				modified();
+-			if(vflag)
+-				ncom('f');
+-		}
+-		else
+-			ncom('f');
+-		continue;
+-	case 'g':
+-		global(TRUE);
+-		continue;
+-	case 'G':
+-		globuf(TRUE);
+-		continue;
+-	case 'h':
+-		setnoaddr();
+-		if(nextchar()=='\n')
+-			error('x');
+-		if('0'<=peekc && peekc<='9')
+-			until(TRUE, getnum());
+-		else
+-			until(FALSE, 0);
+-		continue;
+-	case 'i':
+-		setdot();
+-		nonzero();
+-		setapp();
+-		append(gettty, addr2-1);
+-		continue;
+-	case 'j':
+-		setdot();
+-		if (addr1 == addr2 && lastsep == '\n'){
+-			addr1--;
+-			if(addr1 <= zero)
+-				error('$');
+-		}
+-		nonzero();
+-		join();
+-		continue;
+-	case 'k':
+-		c = getaz(c);
+-		setdot();
+-		nonzero();
+-		names[c] = *addr2 | 01;
+-		continue;
+-	case 'm':
+-		move(FALSE);
+-		continue;
+-	case 'n':
+-	case 'N':
+-		ncom(c);
+-		continue;
+-	case 'o':
+-		setnoaddr();
+-		c = getchar();
+-		r=posn(c, opcs);
+-		if(r >= 0)
+-			setreset(option[r]);
+-		else switch(c) {
+-		case 'B':
+-			if(nextchar() == '\n')
+-				clearstring(BROWSE);
+-			else {
+-				startstring();
+-				while((c=getchar()) != '\n')
+-					addstring(c);
+-				copystring("\\N");
+-				setstring(BROWSE);
+-			}
+-			break;
+-		case '?':
+-			if ((r = posn(getchar(), opcs)) < 0)
+-				error('O');
+-			settruth(*option[r]);
+-			break;
+-		case 'q':
+-			c = getchar();
+-			if(c=='s' || c =='r')
+-				signal(SIGQUIT, c=='r');
+-			else
+-				error('x');
+-			break;
+-		case 'u':
+-			c = getchar();
+-			if(c == 'r')
+-				uflag = 0;
+-			else if(posn(c, "slu") >= 0)
+-				uflag = c;
+-			else
+-				error('x');
+-			break;
+-		case 'b':
+-			if((r=getnum()) > 0)
+-				pagesize = r;
+-			if(posn(nextchar(), lchars) >=0)
+-				bformat = getchar();
+-			break;
+-		default:
+-			error('x');
+-		}
+-		continue;
+-	case '\n':
+-		if (a==0) {
+-			if(stackp != &stack[0] || !startline)
+-				continue;
+-			if(*string[BROWSE].str){
+-				pushinp(BRWS, 0, FALSE);
+-				continue;
+-			}
+-			a = dot+1;
+-			addr2 = a;
+-			addr1 = a;
+-		}
+-		if (lastsep==';')
+-			addr1 = a;
+-		c = 'p';	/* fall through */
+-	case 'L':
+-	case 'l':
+-	case 'p':
+-	case 'P':
+-		display(c);
+-		continue;
+-	case EOF:
+-		return;
+-	case 'Q':
+-	case 'q':
+-		setnoaddr();
+-		if(c!=EOF && (!startline || getchar()!='\n'))
+-			error('x');
+-		if(c!='Q' && !qok){
+-			register struct buffer *bp;
+-			syncbuf();
+-			qok=TRUE;
+-			for(bp=buffer; bp<&buffer[NBUFS]; bp++)
+-				if(bp->cflag && (bp->dol>bp->zero ||
+-					string[FILE(bp-buffer)].str[0]))
+-					error('q');
+-		}
+-		unlink(tfname);
+-		exit(lasterr);
+-	case 'r':
+-		newfile(TRUE, SAVEIFFIRST, string[savedfile].str);
+-	caseread:
+-		if((io = open(string[FILEBUF].str, 0)) < 0){
+-			if(initflag){
+-				putchar('?');
+-				putchar('o');
+-				putchar(' ');
+-				puts(string[FILEBUF].str);
+-				continue;
+-			}
+-			lastc = '\n';
+-			error('o'|FILERR);
+-		}
+-		setall();
+-		changed = (zero!=dol);
+-		ninbuf = 0;
+-		append(getfile, addr2);
+-		if(eqstr(string[savedfile].str, string[FILEBUF].str))
+-			if(cflag = changed)	/* Assignment = */
+-				modified();
+-		/* else append got cflag right */
+-		exfile();
+-		continue;
+-	case 'R':
+-		setnoaddr();
+-		newfile(TRUE, SAVENEVER, "q");
+-		restor();
+-		continue;
+-	case 's':
+-		setdot();
+-		nonzero();
+-		substitute(stackp != &stack[0], -1);
+-		continue;
+-	case 'S':
+-		setnoaddr();
+-		newfile(TRUE, SAVENEVER, "q");
+-		savall();
+-		continue;
+-	case 't':
+-		move(TRUE);
+-		continue;
+-	case 'u':
+-		setnoaddr();
+-		undo();
+-		modified();
+-		continue;
+-	case 'v':
+-		global(FALSE);
+-		continue;
+-	case 'V':
+-		globuf(FALSE);
+-		continue;
+-	case 'W':
+-	case 'w':
+-		if(addr2==0 && dol==zero)
+-			error('$');
+-		setall();
+-		if(newfile(TRUE, SAVEIFFIRST, string[savedfile].str))
+-			changed = cflag;
+-		else
+-			changed = (addr1>(zero+1) || addr2!=dol);
+-		if(c=='w' || (io=open(string[FILEBUF].str,1))==-1){
+-		  Create:
+-			if ((io = creat(string[FILEBUF].str, 0666)) < 0)
+-				error('o'|FILERR);
+-		}else{
+-			if((locn=lseek(io, 0L, 2)) == -1L)
+-				goto Create;
+-			if(locn != 0L)	/* W on non-empty file */
+-				changed = TRUE;	/* PHEW! figured it out */
+-		}
+-		putfile();
+-		if(cflag = changed)	/* Assignment = */
+-			modified();
+-		exfile();
+-		continue;
+-	case 'x':
+-		setdot();
+-		nonzero();
+-		xform();
+-		continue;
+-	case 'y':
+-		jump();
+-		continue;
+-	case 'z':
+-		strcom(getaz('z'));
+-		continue;
+-	case 'Z':
+-		setnoaddr();
+-		if((c=getchar())!=' ' && c!='\n')
+-			error('x');
+-		delall();
+-		cflag=FALSE;
+-		clearstring(savedfile);
+-		continue;
+-	case '"':
+-		setdot();
+-		dot=addr2;
+-		comment();
+-		continue;
+-	case '=':
+-		setall();
+-		putdn((addr2-zero)&077777);
+-		continue;
+-	case '>':
+-	case '<':
+-	case '|':
+-		setall();
+-	case '!':
+-		Unix(c);
+-		continue;
+-	case '#':
+-		setnoaddr();
+-		allnums();
+-		continue;
+-	case '%':
+-		setnoaddr();
+-		allstrs();
+-		continue;
+-	}
+-	error('x');
+-	}
+-}
+-setreset(opt)
+-	register int *opt;
+-{
+-	register c;
+-
+-	c = getchar();
+-	if(c!='s' && c!= 'r')
+-		error('x');
+-	*opt = (c=='s');
+-}
+-delall(){
+-	if(dol!=zero){
+-		addr1=zero+1;
+-		addr2=dol;
+-		delete();
+-	}
+-}
+//GO.SYSIN DD main.c
+echo misc.c 1>&2
+sed 's/.//' >misc.c <<'//GO.SYSIN DD misc.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define SIGINT	2
+-bufinit(n)
+-	int *n;
+-{
+-	struct buffer *bufp;
+-	register *fend;
+-	fend=n;
+-	for(bufp=buffer;bufp!=buffer+NBUFS;bufp++){
+-		bufp->zero=fend;
+-		bufp->dot=fend;
+-		bufp->dol=fend;
+-		bufp->cflag = FALSE;
+-	}
+-}
+-chngbuf(bb)
+-	int bb;
+-{
+-	syncbuf();
+-	newbuf(bb);
+-	savedfile = FILE(curbuf-buffer);
+-}
+-newbuf(bb){
+-	curbuf = buffer+bb;
+-	zero=curbuf->zero;
+-	dot=curbuf->dot;
+-	dol=curbuf->dol;
+-	cflag = curbuf->cflag;
+-}
+-fixbufs(n)
+-	register n;
+-{
+-	register struct buffer *bufp;
+-	lock++;
+-	for(bufp=curbuf+1;bufp!=buffer+NBUFS;bufp++){
+-		bufp->zero+=n;
+-		bufp->dot+=n;
+-		bufp->dol+=n;
+-	}
+-	unlock();
+-}
+-syncbuf()
+-{
+-	/* curbuf->zero = zero;	/* we never assign to it, so needn't save */
+-	curbuf->dot=dot;
+-	curbuf->dol=dol;
+-	curbuf->cflag = cflag!=FALSE;	/* Normalize to fit in a char */
+-}
+-error(code)
+-{
+-	extern savint;	/* error during a ! > < | ?? */
+-	unlock();
+-	if(code){
+-		for(;stackp != stack ;--stackp)
+-			if(stackp->type == BUF || stackp->type == STRING){
+-				putchar('?');
+-				if(stackp->type == BUF){
+-					putchar('b');
+-					putchar(bname[stackp->bufptr - buffer]);
+-					putlong((long)stackp->lineno);
+-					putchar('.');
+-				}else{
+-					putchar('z');
+-					putchar(bname[stackp->lineno]);
+-				}
+-				putlong((long)stackp->charno);
+-				putchar(' ');
+-			}
+-		putchar('?');
+-		putchar(lasterr=(code&~FILERR));
+-		if(code&FILERR){
+-			putchar(' ');
+-			putl(string[FILEBUF].str);
+-		} else
+-			putchar('\n');
+-	}
+-	if(eflag && code)
+-		exit(code);
+-	nestlevel = 0;
+-	listf = FALSE;
+-	gflag = FALSE;
+-	biggflag = FALSE;
+-	stackp = stack;
+-	peekc = 0;
+-	if(code && code!='?'){		/* if '?', system cleared tty input buf */
+-		while(lastttyc!='\n' && lastttyc!=EOF){
+-			getchar();
+-		}
+-	}
+-	lseek(0, 0L, 2);
+-	if (io > 0) {
+-		close(io);
+-		io = -1;
+-		cflag = TRUE;	/* well, maybe not, but better be safe */
+-	}
+-	appflag=0;
+-	if(savint>=0){
+-		signal(SIGINT, savint);
+-		savint= -1;
+-	}
+-	reset();
+-}
+-init()
+-{
+-	register char *p;
+-	register pid;
+-	lock++;
+-	close(tfile);
+-	tfname = "/tmp/qxxxxx";
+-	pid = getpid();
+-	for (p = &tfname[11]; p > &tfname[6];) {
+-		*--p = (pid%10) + '0';
+-		pid /= 10;
+-	}
+-	close(creat(tfname, 0600));
+-	tfile = open(tfname, 2);
+-	ioctl(tfile, FIOCLEX, 0);
+-	brk(fendcore);
+-	bufinit(fendcore);
+-	newbuf(0);
+-	lastdol=dol;
+-	endcore = fendcore - 2;
+-	stackp=stack;
+-	stackp->type=TTY;
+-	unlock();
+-}
+-comment()
+-{
+-	register c, mesg;
+-
+-	c = getchar();
+-	mesg = 0;
+-	if(c == '\"') {
+-		mesg++;
+-		c = getchar();
+-	}
+-	while(c != '\n' && c != '\"') {
+-		if(mesg)
+-			putchar(c);
+-		c = getchar();
+-	}
+-	if(mesg) {
+-		if(c == '\n')
+-			putchar(c);
+-		flush();
+-	}
+-}
+-abs(n)
+-register n;
+-{
+-	return(n<0?-n:n);
+-}
+-/*
+- * Slow, but avoids garbage collection
+- */
+-settruth(t)
+-	register t;
+-{
+-	if(atoi(string[TRUTH].str) != t)
+-		numset(TRUTH, t);
+-}
+-setcount(c)
+-	register c;
+-{
+-	if(atoi(string[COUNT].str) != c)
+-		numset(COUNT, c);
+-}
+-truth(){
+-	return(atoi(string[TRUTH].str) != FALSE);
+-}
+-modified(){
+-	cflag=TRUE;
+-	eok=FALSE;
+-	qok=FALSE;
+-}
+//GO.SYSIN DD misc.c
+echo move.c 1>&2
+sed 's/.//' >move.c <<'//GO.SYSIN DD move.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-move(copyflag)
+-{
+-	register int *adt, *ad1, *ad2;
+-	int fb, tb;
+-	int todot;
+-	int tonewdot;
+-	int totmved;
+-	int temp;
+-	int getcopy();
+-
+-	setdot();
+-	nonzero();
+-	fb = curbuf - buffer;
+-	temp = getchar();
+-	tb = posn(temp, bname);
+-	if(tb >= 0)
+-		chngbuf(tb);
+-	else{
+-		ungetchar(temp);
+-		tb = fb;
+-	}
+-	if ((adt = address())==0){
+-		chngbuf(fb);
+-		error('x');
+-	}
+-	todot = adt - buffer[tb].zero;	/* syncbuf not needed! */
+-	chngbuf(fb);
+-	ad1 = addr1;
+-	ad2 = addr2;
+-	totmved = ad2 - ad1 + 1;
+-	lock++;
+-	if (copyflag) {
+-		tonewdot = addr2 - buffer[fb].zero;
+-		/*
+-		 * NOTE: in the copy command
+-		 *	copies of the lines are created using append
+-		 *	and then moved to the target position.
+-		 *	They are appended at the dollar of their
+-		 *	original buffer. (guarenteed to be higher address)
+-		 *	They are NOT appended at the target position
+-		 *	since, if the target position was lower than their
+-		 *	source position, getcopy would have to account
+-		 *	for the shift of the addresses due to the insert
+-		 *	of the copies.
+-		 */
+-		ad1 = dol;
+-		temp = cflag;
+-		append(getcopy, ad1++);
+-		cflag = temp;
+-		ad2 = dol;
+-	} else
+-		tonewdot = addr1 - buffer[fb].zero - 1;
+-	ad2++;
+-	adt = buffer[tb].zero + todot;
+-	chngbuf(tb);
+-	if (adt<ad1) {
+-		if ((++adt)!=ad1){
+-			reverse(adt, ad1);
+-			reverse(ad1, ad2);
+-			reverse(adt, ad2);
+-		}
+-	} else {
+-		if (adt++ >= ad2) {
+-			reverse(ad1, ad2);
+-			reverse(ad2, adt);
+-			reverse(ad1, adt);
+-		} else {
+-			if(ad2 != zero + 1){
+-				error('m');
+-			}
+-		}
+-	}
+-	fixup(fb, tb, totmved);
+-	buffer[fb].dot = buffer[fb].zero + tonewdot;
+-	if(copyflag == 0 && fb == tb && todot >= tonewdot){
+-		todot -= totmved;
+-	}
+-	if(!copyflag)
+-		buffer[fb].cflag = TRUE;
+-	modified();
+-	dot = buffer[tb].dot = buffer[tb].zero + todot + totmved;
+-	zero = buffer[tb].zero;
+-	dol = buffer[tb].dol;
+-	unlock();
+-}
+-fixup(from,to,tot) int from, to, tot;
+-{
+-	register int b;
+-	register int n;
+-	register int lo;
+-	int hi;
+-	if(to == from){
+-		return;
+-	}
+-	if(to < from){
+-		n = tot;
+-		lo = to;
+-		hi = from;
+-	} else {
+-		n = -tot;
+-		lo = from;
+-		hi = to;
+-	}
+-	buffer[lo].dol += n;
+-	for(b = lo;++b < hi;){
+-		buffer[b].zero += n;
+-		buffer[b].dot += n;
+-		buffer[b].dol += n;
+-	}
+-	buffer[hi].zero += n;
+-}
+-reverse(a1, a2)
+-	register int *a1, *a2;
+-{
+-	register t;
+-	for (;;) {
+-		t = *--a2;
+-		if (a2 <= a1)
+-			return;
+-		*a2 = *a1;
+-		*a1++ = t;
+-	}
+-}
+-getcopy()
+-{
+-	if (addr1 > addr2)
+-		return(EOF);
+-	getline(*addr1++, linebuf);
+-	return(0);
+-}
+//GO.SYSIN DD move.c
+echo pattern.c 1>&2
+sed 's/.//' >pattern.c <<'//GO.SYSIN DD pattern.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define ESIZE	128	/* ESIZE-1 must fit in a signed byte */
+-char	expbuf[ESIZE+4];
+-int	expgood	/*0*/;		/* flag indicating if compiled exp is good */
+-#define	CCHR	2
+-#define	CDOT	4
+-#define	CCL	6
+-#define	NCCL	8
+-#define CFUNNY	10
+-#define	CALT	12
+-#define	CBACK	14
+-
+-#define	STAR	01
+-#define STARABLE CBACK
+-
+-#define	CKET	16
+-#define	CDOL	17
+-#define	CEOF	18
+-#define	CBRA	19
+-#define CBOI	20
+-#define CEOI	21
+-#define CSPACE	22
+-int	circfl;
+-char	pmagic[] = "/.$^*+\\()<|>{}[!_123456789";
+-compile(eof)
+-char eof;
+-{
+-	register c;
+-	register char *ep, *penultep;
+-	char *lastep, *bracketp, bracket[NBRA];
+-	int getsvc();
+-	int getchar();
+-	struct{
+-		char	*althd;		/* start of code for < ... > */
+-		char	*altlast;	/* start of code for last < or | */
+-		char	*bpstart;	/* bracketp at start of < and | */
+-		char	*bpend;		/* bracketp at end of > or | */
+-		int	nbstart;	/* nbra at start of < and | */
+-		int	nbend;		/* nbra at end of > or | */
+-		int	firstalt;	/* is this the first alternative? */
+-	} *asp, altstk[NBRA];
+-
+-	if(eof == '\n')
+-		error('x');
+-	pmagic[0] = eof;
+-	if ((c=nextchar()) == eof || c=='\n') {
+-		if (!expgood)
+-			goto cerror;
+-		if(c!='\n')
+-			getchar();	/* eat the eof character */
+-		return;
+-	}
+-	expgood = FALSE;
+-	ep = expbuf;
+-	lastep = 0;
+-	bracketp = bracket;
+-	nbra = 0;
+-	asp = &altstk[-1];
+-	startstring();	/* for the saved pattern register */
+-	circfl = 0;
+-	if (c=='^') {
+-		getsvc();	/* save the caret */
+-		circfl++;
+-	}
+-	for (;;) {
+-		c = getquote(pmagic, getsvc);
+-		if (c==eof || c=='\n') {
+-			if (bracketp!=bracket || asp>=altstk)
+-				goto cerror;
+-			*ep++ = CEOF;
+-			expgood = TRUE;
+-			dropstring();	/* lose the eof character */
+-			setstring(SAVPAT);
+-			if(c=='\n')
+-				ungetchar(c);
+-			return;
+-		}
+-		if (ep >= &expbuf[ESIZE-5])
+-			goto cerror;
+-		penultep = lastep;
+-		lastep = ep;
+-
+-		if(c != (eof|0200)) switch (c) {
+-		case '('|0200:
+-			if (nbra >= NBRA)
+-				goto cerror;
+-			*bracketp++ = nbra;
+-			*ep++ = CBRA;
+-			*ep++ = nbra++;
+-			continue;
+-		case ')'|0200:
+-			if (bracketp <= bracket)
+-				goto cerror;
+-			*ep++ = CKET;
+-			*ep++ = *--bracketp;
+-			continue;
+-		case '{'|0200:
+-			*ep++ = CBOI;
+-			continue;
+-		case '}'|0200:
+-			*ep++ = CEOI;
+-			continue;
+-		case '_'|0200:
+-			*ep++ = CSPACE;
+-			continue;
+-		case '!'|0200:
+-			*ep++ = CFUNNY;
+-			continue;
+-		case '<':
+-			if (++asp >= &altstk[NBRA])
+-				goto cerror;
+-			*ep++ = CALT;
+-			asp->althd = ep;
+-			ep++;
+-			asp->bpstart = bracketp;
+-			asp->nbstart = nbra;
+-			asp->firstalt = TRUE;
+-			asp->altlast = ep++;
+-			lastep = 0;
+-			continue;
+-		case '|':
+-			if (asp<altstk)
+-				break;
+-			if (asp->firstalt) {
+-				asp->bpend = bracketp;
+-				asp->nbend = nbra;
+-			}
+-			if (bracketp!=asp->bpend || nbra!=asp->nbend)
+-				goto cerror;
+-			*ep++ = CEOF;
+-			asp->altlast[0] = ep-asp->altlast;
+-			asp->firstalt = FALSE;
+-			bracketp = asp->bpstart;
+-			nbra = asp->nbstart;
+-			asp->altlast = ep++;
+-			lastep = 0;
+-			continue;
+-		case '>':
+-			if (asp<altstk)
+-				break;
+-			if (!asp->firstalt &&
+-			    (bracketp!=asp->bpend || nbra!=asp->nbend))
+-				goto cerror;
+-			*ep++ = CEOF;
+-			asp->altlast[0] = ep-asp->altlast;
+-			lastep = asp->althd;
+-			*lastep = ep-lastep;
+-			lastep--;
+-			if (bracketp!=asp->bpstart || nbra!=asp->nbstart)
+-				lastep = 0;
+-			asp--;
+-			continue;
+-		case '*':
+-		case '+':
+-			if (penultep==0){
+-				*ep++ = CCHR;
+-				*ep++ = c;
+-			} else {
+-				if(*penultep>STARABLE)
+-					goto cerror;
+-				if(c == '+'){
+-					if((ep-penultep)+ep >= &expbuf[ESIZE-1])
+-						goto cerror;
+-					do
+-						*ep++ = *penultep++;
+-					while (penultep!=lastep);
+-				}
+-				*penultep |= STAR;
+-				lastep = 0;
+-			}
+-			continue;
+-		case '.':
+-			*ep++ = CDOT;
+-			continue;
+-
+-		case '[':
+-			penultep = ep;
+-			*ep++ = CCL;
+-			*ep++ = 0;
+-			if ((c=getsvc()) == '^') {
+-				c = getsvc();
+-				ep[-2] = NCCL;
+-			}
+-			do {
+-				if (c == EOF || c == '\n')
+-					goto cerror;
+-				*ep++ = c;
+-				if ((lastc=getsvc()) == '-') {
+-					c=getsvc();
+-					if (c == EOF || c == '\n' || c<=ep[-1])
+-						goto cerror;
+-					ep[-1] |= 0200;
+-					*ep++ = c;
+-					lastc = getsvc();	/* prime lastc */
+-				} else if (dflag&&'a'<=(c|' ')&&(c|' ')<='z')
+-					*ep++ = c^' ';
+-				if (ep >= &expbuf[ESIZE-1])
+-					goto cerror;
+-			} while ((c=lastc) != ']');
+-			penultep[1] = ep-penultep-1;
+-			continue;
+-
+-
+-		case '$':
+-			if (nextchar() == eof || peekc=='\n') {
+-				*ep++ = CDOL;
+-				continue;
+-			}
+-			/* fall through */
+-		default:
+-			break;
+-		}
+-		/* if fell through switch, match literal character */
+-		/* Goddamned sign extension! */
+-		if ((c&0200) && (c&0177)>='1' && (c&0177)<='9') {
+-			*ep++ = CBACK;
+-			*ep++ = c-('1'|0200);
+-			continue;
+-		}
+-		c &= ~0200;
+-		if(dflag && c|' '>='a' && c|' '<='z'){
+-			*ep++ = CCL;
+-			*ep++ = 3;
+-			*ep++ = c;
+-			*ep++ = c^' ';
+-		}
+-		else{
+-			*ep++ = CCHR;
+-			*ep++ = c;
+-		}
+-	}
+-   cerror:
+-	error('p');
+-}
+-getsvc(){
+-	register c;
+-	addstring(c=getchar());
+-	return(c);
+-}
+-int
+-execute(addr)
+-	int *addr;
+-{
+-	register char *p1, *p2;
+-
+-	if (addr==0) {
+-		if((p1=loc2) == 0)	/* G command */
+-			p1 = linebuf;
+-		else if (circfl)	/* not first search in substitute */
+-			return(FALSE);
+-	} else {
+-		if (addr==zero)
+-			return(FALSE);
+-		p1 = getline(*addr, linebuf);
+-	}
+-	p2 = expbuf;
+-	if (circfl) {
+-		loc1 = p1;
+-		return(advance(p1, p2));
+-	}
+-	do {
+-		if (*p2 != CCHR  ||  p2[1] == *p1) {
+-			if (advance(p1, p2)) {
+-				loc1 = p1;
+-				return(TRUE);
+-			}
+-		}
+-	} while (*p1++);
+-	return(FALSE);
+-}
+-
+-int
+-advance(lp, ep)
+-	register char *lp, *ep;
+-{
+-	register char *curlp;
+-	char *althd, *altend;
+-
+-	for (;;) {
+-		curlp = lp;
+-		switch (*ep++) {
+-
+-		case CCHR:
+-			if (*ep++ == *lp++)
+-				continue;
+-			return(FALSE);
+-
+-		case CCHR|STAR:
+-			do ; while (*lp++ == *ep);
+-			ep++;
+-			break;
+-
+-		case CDOT:
+-			if (*lp++)
+-				continue;
+-			return(FALSE);
+-
+-		case CDOT|STAR:
+-			do ; while (*lp++);
+-			break;
+-
+-		case CCL:
+-		case NCCL:
+-			if (cclass(ep, *lp++, ep[-1]==CCL)) {
+-				ep += *ep;
+-				continue;
+-			}
+-			return(FALSE);
+-
+-		case CCL|STAR:
+-		case NCCL|STAR:
+-			do ; while (cclass(ep, *lp++, ep[-1]==(CCL|STAR)));
+-			ep += *ep;
+-			break;
+-
+-		case CFUNNY:
+-			if (*lp>=' ' && *lp!='\177' || *lp=='\t' || *lp=='\0')
+-				return(FALSE);
+-			lp++;
+-			continue;
+-
+-		case CFUNNY|STAR:
+-			while (*lp<' ' && *lp && *lp!='\t'  ||  *lp=='\177')
+-				lp++;
+-			lp++;
+-			break;
+-
+-		case CBACK:
+-			if (braelist[*ep]==0)
+-				error('p');
+-			if (backref(*ep++, lp)) {
+-				lp += braelist[ep[-1]] - braslist[ep[-1]];
+-				continue;
+-			}
+-			return(FALSE);
+-	
+-		case CBACK|STAR:
+-			if (braelist[*ep] == 0)
+-				error('p');
+-			curlp = lp;
+-			while (backref(*ep, lp))
+-				lp += braelist[*ep] - braslist[*ep];
+-			while (lp >= curlp) {
+-				if (advance(lp, ep+1))
+-					return(TRUE);
+-				lp -= braelist[*ep] - braslist[*ep];
+-			}
+-			ep++;
+-			continue;
+-
+-		case CBRA:
+-			braslist[*ep++] = lp;
+-			continue;
+-
+-		case CKET:
+-			braelist[*ep++] = lp;
+-			continue;
+-
+-		case CDOL:
+-			if (*lp==0)
+-				continue;
+-			return(FALSE);
+-
+-		case CEOF:
+-			loc2 = lp;
+-			return(TRUE);
+-
+-		case CBOI:
+-			if (alfmatch(*lp,0)
+-			    && (lp==linebuf || !alfmatch(lp[-1],1)))
+-				continue;
+-			return(FALSE);
+-
+-		case CEOI:
+-			if (!alfmatch(*lp,1)
+-			    && lp!=linebuf && alfmatch(lp[-1],1))
+-				continue;
+-			return(FALSE);
+-
+-		case CSPACE:
+-			if (*lp==' ' || *lp=='\t') {
+-				while (*lp == ' ' || *lp=='\t')
+-					lp++;
+-				continue;
+-				}
+-			return(FALSE);
+-
+-		case CALT:
+-			althd = ep-1;
+-			altend = ep + *ep;
+-			for(ep++; ; ep+= *ep) {
+-				if(ep == altend)
+-					return(FALSE);
+-				if(advance(lp,ep+1) && advance(loc2,altend))
+-					return(TRUE);
+-			}
+-
+-		case CALT|STAR:
+-			althd = ep-1;
+-			altend = ep + *ep;
+-			for(ep++; ep!=altend; ep+= *ep){
+-				if(advance(lp, ep+1)){
+-					if(loc2 == lp)
+-						break;
+-					if(advance(loc2, althd))
+-						return(TRUE);
+-				}
+-			}
+-			/* return (advance(lp,altend)) */
+-			continue;
+-
+-		default:
+-			error('!');
+-		}
+-		/* star logic: executed by falling out of switch */
+-		do {
+-			lp--;
+-			if (advance(lp, ep))
+-				return(TRUE);
+-		} while (lp > curlp);
+-		return(FALSE);
+-	}
+-}
+-
+-backref(i, lp)
+-register i;
+-register char *lp;
+-{
+-	register char *bp;
+-
+-	bp = braslist[i];
+-	while (*bp++ == *lp++)
+-		if (bp >= braelist[i])
+-			return(TRUE);
+-	return(FALSE);
+-}
+-int alfmatch(c,tail)
+-register char c;
+-{
+-	return (('a' <= c && c <= 'z')  ||
+-		('A' <= c && c <= 'Z')  ||
+-		(c == '_') ||
+-		(tail && '0' <= c && c<= '9'));
+-}
+-
+-
+-cclass(set, c, f)
+-	register char *set;
+-	register c;
+-{
+-	register n;
+-	if (c == 0)
+-		return(0);
+-	n = *set++;
+-	while (--n) {
+-		if (*set&0200) {
+-			if ((*set++ & 0177) <= c) {
+-				if (c <= *set++)
+-					return(f);
+-			} else
+-				set++;
+-			--n;
+-		} else if (*set++ == c)
+-			return(f);
+-	}
+-	return(!f);
+-}
+//GO.SYSIN DD pattern.c
+echo putchar.c 1>&2
+sed 's/.//' >putchar.c <<'//GO.SYSIN DD putchar.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#ifdef	PDP11
+-typedef	long ulong;
+-#else
+-typedef	unsigned long ulong;
+-#endif
+-int	col;
+-putdn(i)
+-{
+-	putlong((ulong)i);
+-	putchar('\n');
+-}
+-#ifdef	PDP11
+-/*
+- *	In version 6, ldiv() is in the library. In version 7, it is separate:
+-	.globl	_ldiv, _ldivr
+-	_ldiv:
+-		mov	2(sp), r0
+-		mov	4(sp), r1
+-		div	6(sp), r0
+-		mov	r1,_ldivr
+-		rts	pc
+-	.bss
+-	_ldivr:	.=.+2
+- */
+-putlong(i)
+-	long i;
+-{
+-	register char r;
+-	extern int ldiv(), ldivr;
+-
+-	/* the following pornography saves bundles of memory */
+-	i = ldiv(i,10);
+-	r = ldivr + '0';
+-	if (i)
+-		putlong(i);
+-	putchar(r);
+-}
+-#endif
+-#ifndef	PDP11
+-putlong(i)
+-	ulong i;
+-{
+-	register r;
+-	r = i%10;
+-	i /= 10;
+-	if(i)
+-		putlong(i);
+-	putchar('0'+r);
+-}
+-#endif
+-putl(sp)
+-	register char *sp;
+-{
+-	listf++;
+-	puts(sp);
+-	listf = FALSE;
+-}
+-puts(sp)
+-	register char *sp;
+-{
+-	col = 0;
+-	while (*sp)
+-		putchar(*sp++);
+-	putchar('\n');
+-}
+-display(lf)
+-{
+-	register int *a1;
+-	register int r;
+-	register char *p;
+-	register i;
+-	int nf;
+-	listf = (lf == 'l' || lf == 'L');
+-	nf = (lf == 'P' || lf == 'L');
+-	lf = listf;
+-	setdot();
+-	nonzero();
+-	a1 = addr1;
+-	r = (a1 - zero) & 077777;
+-	do{
+-		col = 0;
+-		if(nf){
+-			putlong((ulong)r++);
+-			for(i=0; i<NBUFS; i++)
+-				if((*a1|01) == names[i]){
+-					putchar('\'');
+-					putchar(bname[i]);
+-				}
+-			listf = 0;
+-			putchar('\t');
+-			col = 8;
+-			listf = lf;
+-		}
+-		for(p = getline(*a1++,linebuf);*p;putchar(*p++));
+-		putchar('\n');
+-	}while (a1 <= addr2);
+-	dot = addr2;
+-	listf = FALSE;
+-}
+-putct(c){
+-	putchar(c);
+-	putchar('\t');
+-}
+-putchar(c)
+-register char c;
+-{
+-	register char *lp;
+-
+-	lp = linp;
+-	if (listf) {
+-		if (c=='\n') {
+-			if(linp!=line && linp[-1]==' ') {
+-				*lp++ = '\\';
+-				*lp++ = 'n';
+-			}
+-		} else {
+-			if (col >= (72-4-2)) {
+-				*lp++ = '\\';
+-				*lp++ = '\n';
+-				*lp++ = '\t';
+-				col = 8;
+-			}
+-			col++;
+-			if (c=='\b' || c=='\\' || c=='\t') {
+-				*lp++ = '\\';
+-				c = c=='\b'? 'b' : c=='\t'? 't' : '\\';
+-				col++;
+-			} else if ((c&0200) || c<' ' || c=='\177') {
+-				*lp++ = '\\';
+-				*lp++ = ((c>>6)&03)+'0';
+-				*lp++ = ((c>>3)&07)+'0';
+-				c     = ( c    &07)+'0';
+-				col += 3;
+-			}
+-		}
+-	}
+-	*lp++ = c;
+-	if(c == '\n' || lp >= &line[(sizeof line)-2-4]) {
+-		linp = lp;
+-		flush();
+-		lp = linp;
+-	}
+-	linp = lp;
+-}
+-flush()
+-{
+-	if(linp != line){
+-		write(1, line, linp-line);
+-		linp = line;
+-	}
+-}
+//GO.SYSIN DD putchar.c
+echo setaddr.c 1>&2
+sed 's/.//' >setaddr.c <<'//GO.SYSIN DD setaddr.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-extern noaddr;
+-setdot()
+-{
+-	if (addr2 == 0)
+-		addr1 = addr2 = dot;
+-	if (addr1 > addr2)
+-		error('$');
+-}
+-setall()
+-{
+-	if (noaddr) {
+-		addr1 = zero+1;
+-		addr2 = dol;
+-		if (dol==zero)
+-			addr1 = zero;
+-	}
+-	setdot();
+-}
+-setnoaddr()
+-{
+-	extern noaddr;
+-	if (noaddr == FALSE)
+-		error('$');
+-}
+-nonzero()
+-{
+-	if (addr1<=zero || addr2>dol)
+-		error('$');
+-}
+//GO.SYSIN DD setaddr.c
+echo string.c 1>&2
+sed 's/.//' >string.c <<'//GO.SYSIN DD string.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-#define	strfree string[NSTRING].str
+-char *strstart;
+-
+-length(s)
+-	register char *s;
+-{
+-	register char *t;
+-	if((t=s)==0)
+-		return(0);
+-	do;while(*t++);
+-	return(t-s-1);
+-}
+-startstring(){
+-	strstart=strfree;
+-}
+-addstring(c){
+-	if(strfree==strchars+NSTRCHARS)
+-		strcompact();
+-	*strfree++ = c;
+-}
+-dropstring(){
+-	--strfree;
+-}
+-cpstr(a, b)
+-	register char *a, *b;
+-{
+-	do;while (*b++ = *a++);
+-}
+-shiftstring(up){	/* A highly machine-dependent routine */
+-	register struct string *sp;
+-	for(sp=string; sp<=string+NSTRING; sp++)
+-		if(up)
+-			sp->str += (int)strarea;
+-		else
+-			sp->str -= (int)strarea;
+-}
+-clearstring(z){
+-	string[z].len = 0;
+-	string[z].str = nullstr;
+-}
+-copystring(s)
+-	register char *s;
+-{
+-	while(*s)
+-		addstring(*s++);
+-}
+-eqstr(a, b)
+-	register char *a, *b;
+-{
+-	while(*a)
+-		if(*a++ != *b++)
+-			return(FALSE);
+-	return(*b=='\0');
+-}
+-/*
+- * dupstring duplicates a string.
+- * Because we may strcompact(), we do it first if necessary.
+- */
+-dupstring(z)
+-{
+-	if(strfree+string[z].len > strchars+NSTRCHARS)
+-		strcompact();	/* if insufficient, will get error when we copystring() */
+-	copystring(string[z].str);
+-}
+-setstring(n){
+-	addstring('\0');
+-	if((string[n].len = length(strstart)) == 0)
+-		string[n].str = nullstr;
+-	else
+-		string[n].str = strstart;
+-	if(strfree >= strchars + NSTRCHARS)
+-		strcompact();
+-}
+-strcompact(){
+-	register struct string *cursor;
+-	struct string *thisstr;
+-	register char *s, *t;
+-	lock++;
+-	s=strchars;
+-	for(;;){
+-		t=strchars+NSTRCHARS;
+-		for(cursor=string;cursor!=string+NSTRING;cursor++)
+-			if(s<=cursor->str && cursor->str<t){
+-				t = cursor->str;
+-				thisstr = cursor;
+-			}
+-		if(t==strchars+NSTRCHARS)
+-			break;
+-		thisstr->str=s;
+-		do;while(*s++ = *t++);
+-	}
+-	t=strstart;
+-	strstart=s;
+-	while(t!=strfree)
+-		*s++ = *t++;
+-	strfree=s;
+-	if(s==strchars+NSTRCHARS){
+-		strfree=strstart;
+-		error('Z');
+-	}
+-	unlock();
+-}
+//GO.SYSIN DD string.c
+echo subs.c 1>&2
+sed 's/.//' >subs.c <<'//GO.SYSIN DD subs.c'
+-/*% cc -c -O %
+- */
+-#include "vars.h"
+-char *next_new;
+-char *next_old;
+-int new_line;
+-int old_line;
+-char rhsbuf[RHSIZE];
+-
+-substitute(inglob, reg)
+-{
+-	register int n, m;
+-	register char *p;
+-	char *q;
+-	int *a1;
+-	int gsubf;
+-	extern int getsub();
+-	int t, count, autop=0;
+-
+-	count=0;
+-	t = FALSE;
+-	n=getnum();
+-	gsubf = compsub(TRUE, &autop);
+-	if(reg!= -1){	/* Substitution in a register */
+-		cpstr(string[reg].str, linebuf);
+-		loc2=0;	/* signal execute to take line from linebuf */
+-		a1=0;
+-		goto Do_it;
+-	}
+-	for (a1 = addr1; a1 <= addr2 && reg==-1; a1++) {
+-	Do_it:
+-		if (execute(a1)) {
+-			next_old=linebuf;
+-			next_new=genbuf;
+-			m=n;
+-			do {
+-				if (--m <= 0) {
+-					dosub();
+-					t = TRUE;
+-					count++;
+-					if (!gsubf)
+-			break;
+-				}
+-				/* can't find something at EOL twice */
+-				if (*loc2=='\0')
+-			break;
+-				/* can't match same location twice */
+-				if (loc1==loc2)
+-					loc2++;
+-			} while (execute((int *)0));
+-			if (m<=0) {
+-				inglob |= TRUE;
+-				p=next_old;
+-				do ; while (*p++);
+-				place(next_old,p,0);
+-				if(reg==-1){
+-					p=linebuf;
+-					q=genbuf;
+-					do ; while (*p++ = *q++);
+-					replace(a1,putline());
+-					m=append(getsub,a1);
+-					a1 += m;
+-					addr2 += m;
+-				}else{
+-					startstring();
+-					copystring(genbuf);
+-					setstring(reg);
+-				}
+-			}
+-		}
+-	}
+-	if (!inglob)
+-		error('s');
+-	settruth(t);
+-	setcount(count);
+-	if(autop)
+-		if(reg>=0)
+-			puts(string[reg].str);
+-		else{
+-			addr1=addr2=dot;
+-			display('p');
+-		}
+-}
+-
+-compsub(subbing, autop)
+-	int subbing;
+-	int *autop;
+-{
+-	register int seof, c;
+-	char *rhsmagic;
+-	register char *p;
+-	int getsvc();
+-
+-	*autop=FALSE;
+-	seof = getchar();
+-	if(subbing) {
+-		compile(seof);
+-		rhsmagic = "/&^\n\\123456789";
+-	}
+-	else
+-		rhsmagic = "/\\\n";
+-	rhsmagic[0] = seof;
+-	p = rhsbuf;
+-	startstring();
+-	for (;;) {
+-		c = getquote(rhsmagic, getsvc);
+-		if (c=='\n' || c==EOF){
+-			*autop=TRUE;
+-			ungetchar('\n');
+-			break;
+-		}
+-		if (c==seof)
+-			break;
+-		*p++ = c;
+-		if (p >= &rhsbuf[RHSIZE])
+-			error('l');
+-	}
+-	*p = 0;
+-	dropstring();
+-	setstring(SAVRHS);
+-	if (subbing && nextchar() == 'g') {
+-		getchar();	/* clear 'g' */
+-		return(1);
+-	}
+-	return(0);
+-}
+-int getsub()
+-{
+-	register char *p1, *p2;
+-
+-	p1 = linebuf;
+-	if ((p2 = linebp) == 0)
+-		return(EOF);
+-	do ; while (*p1++ = (*p2++ & 0177));
+-	linebp = 0;
+-	return(0);
+-}
+-
+-dosub()
+-{
+-	register int c;
+-	register char *p;
+-
+-	place(next_old,loc1,0);
+-	next_old=loc2;
+-	p=rhsbuf;
+-	while (c = *p++) {
+-		if (c=='&' || (c == '^' && uflag))
+-			place(loc1,loc2,c=='^');
+-		else if ((c&0200) && (c &= 0177)>='1' && c<'1'+nbra)
+-			place(braslist[c-'1'],braelist[c-'1'], 0);
+-		else {
+-			*next_new++ = c;
+-			if (next_new >= genbuf+LBSIZE)
+-				error('l');
+-		}
+-	}
+-}
+-
+-place(l1, l2, ucase)
+-	register char *l1;
+-	char *l2;
+-{
+-	register char *sp;
+-	register c;
+-
+-	sp = next_new;
+-	while (l1 < l2) {
+-		*sp++ = (*l1++ & 0177);
+-		if (sp >= &genbuf[LBSIZE])
+-			error('l');
+-	}
+-	if(ucase){
+-		for(l1 = next_new;l1 < sp;){
+-			c = (*l1 & 0177);
+-			if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')){
+-				switch(uflag){
+-				case 's':
+-					*l1++ ^= 040;
+-					break;
+-				case 'u':
+-					*l1++ &= ~040;
+-					break;
+-				case 'l':
+-					*l1++ |= 040;
+-					break;
+-				default:
+-					l1++;
+-				}
+-			}else{
+-				l1++;
+-			}
+-		}
+-	}
+-	next_new = sp;
+-}
+-
+-undo()
+-{
+-	register int *l;
+-
+-	for (l=zero+1; l<=dol && (*l|01)!=new_line; l++)
+-		;
+-	if (l>dol)
+-		error('u');
+-	replace(l,old_line);
+-	dot=l;
+-}
+-replace(line,ptr)
+-	register int *line;
+-	register int ptr;
+-{
+-	register int *p;
+-
+-	*line |= 01;
+-	for (p=names; p<names+NBUFS; p++)
+-		if (*p == *line)
+-			*p = ptr|01;
+-	old_line = *line;
+-	*line = ptr;
+-	new_line = ptr | 01;
+-}
+-join()
+-{
+-	register int *l;
+-	register char *p, *q;
+-	int rep;
+-	int autop=FALSE;
+-
+-	rep=FALSE;
+-	if(nextchar() == '/'){
+-		compsub(FALSE, &autop);
+-		rep=TRUE;
+-	}
+-	p = genbuf;
+-	for (l=addr1; ;) {
+-		q = getline(*l++, linebuf);
+-		while (*q) {
+-			*p++ = *q++;
+-			if (p >= genbuf + sizeof genbuf)
+-				error('l');
+-		}
+-		if(l > addr2)
+-			break;
+-		if(rep) {
+-			q = string[SAVRHS].str;
+-			while (*q) {
+-				*p++ = *q++;
+-				if (p >= genbuf + sizeof genbuf)
+-					error('l');
+-			}
+-		}
+-	}
+-	*p = '\0';
+-	linebp=p=linebuf;
+-	q=genbuf;
+-	do ; while (*p++ = *q++);
+-	getsub();
+-	*(l=addr1++)=putline();
+-	/* if you want marks preserved for join, change the above line to
+-	/* the one commented out here.
+-	/* problem: undo then undoes the join, but gets it wrong.  Your choice.
+-	replace(l=addr1++, putline());
+-	*/
+-	if(l != addr2)
+-		delete();
+-	append(getsub, l);
+-	if(autop){
+-		addr1=addr2=dot;
+-		display('p');
+-	}
+-}
+-
+-int next_col(col,cp,input)
+-	register int col;
+-	register char *cp;
+-	int input;
+-{
+-	register c;
+-
+-	c = *cp;
+-	if (c=='\t')
+-		col |= 07;
+-	else if (c<' ' || c=='\177')
+-		error('t'); /* invalid character in x data */
+-	else
+-		if (input && (c==ttybuf.sg_erase || c==ttybuf.sg_kill))
+-			col++;	/* One column for the backslash */
+-	return (++col);
+-}
+-
+-xform()
+-{
+-	register char *i, *m, *o;
+-	int *line, insert, change, ic, mc, c;
+-	char *tf, *tl;
+-
+-	if(getchar() != '\n')
+-		error('x');
+-	for (line=addr1; line<=addr2; line++) {
+-		getline(*line, linebuf);
+-		change=FALSE;
+-		dot=line;
+-		for(;;){
+-			puts(linebuf);
+-			pushinp(XTTY, 0, FALSE);
+-			m=rhsbuf;
+-			while ((c = getchar())!='\n') {
+-				if (c == EOF)
+-					error('t');  /* unexpected EOF */
+-				*m++ = c;
+-				if (m==rhsbuf+RHSIZE-1)
+-					error('l'); /* out of space */
+-			}
+-			*m='\0';
+-			if (m==rhsbuf)
+-				break;
+-			change++;
+-			i=linebuf;
+-			o=genbuf;
+-			do ; while (*o++ = *i++);
+-			if (i+(m-rhsbuf) > linebuf+LBSIZE)
+-				error('l'); /* out of space */
+-			i=genbuf;
+-			o=linebuf;
+-			m=rhsbuf;
+-			insert=FALSE;
+-			ic=0;
+-			mc=0;
+-			while (*i && *m && !insert) {
+-				if(*i=='\t' && *m!='#' && *m!='^' && *m!='$') {
+-					ic=next_col(ic,i,FALSE);
+-					tf=m;
+-					tl=m;
+-					do {
+-						if (*m!=' ' && *m!='\t') {
+-							if(*m=='%')
+-								*m=' ';
+-							tl=m+1;
+-						}
+-						mc=next_col(mc,m++,TRUE);
+-					} while (ic>mc && *m && *m!='#' &&
+-						 *m!='^' && *m!='$');
+-					if (ic>mc) {
+-						ic=mc;
+-						if (*m)
+-							tl=m;
+-					} else {
+-						if (tl==m)
+-							i++;
+-						else
+-							ic--;
+-					}
+-					while (tf!=tl)
+-						*o++ = *tf++;
+-				} else {
+-					mc=next_col(mc,m,TRUE);
+-					*o = *m;
+-					switch (*m++) {
+-					case ' ':
+-					case '\t':
+-						break;
+-					case '^':
+-						mc=ic;
+-						insert++;
+-						break;
+-					case '$':
+-						i="";
+-						break;
+-					case '#':
+-						ic=next_col(ic,i++,FALSE);
+-						while(*m=='#' && ic>mc)
+-						      mc=next_col(mc,m++,TRUE);
+-						if (ic!=mc)
+-							error('t');
+-						break;
+-					case '%':
+-						*o = ' ';
+-						/* fall through */
+-					default:
+-						o++;
+-						ic=next_col(ic,i++,FALSE);
+-					} /* switch */
+-				} /* else */
+-				for (;;) {
+-					if (ic>mc && *m) {
+-						if (*m!=' ' && *m!='\t')
+-							error('t');
+-						mc=next_col(mc,m++,TRUE);
+-					} else if (mc>ic && *i) {
+-						ic=next_col(ic,i,FALSE);
+-						*o++ = *i++;
+-					} else
+-						break;
+-				}
+-			} /* while */
+-			if (mc>ic && m[-1]=='\t')
+-				*o++ = '\t';
+-			if (insert && (*o++ = *m++) == '\0') {
+-				replace(line,putline());
+-				linebp=i;
+-				append(getsub,line);
+-				line++;
+-				addr2++;
+-				change = FALSE;
+-			} else {
+-				while (*m)
+-					*o++ = *m++;
+-				do ; while (*o++ = *i++);
+-			}
+-		}
+-		if (change)
+-			replace(line,putline());
+-	} /* for */
+-}
+//GO.SYSIN DD subs.c
+echo vars.h 1>&2
+sed 's/.//' >vars.h <<'//GO.SYSIN DD vars.h'
+-/*
+- * QED
+- */
+-#define	VAX	VAX
+-#ifdef	VAX
+-#define	BIGTMP	LOTSOFBITS
+-#endif
+-/*	Fake setexit & reset from v6 using setjmp and longjmp	*/
+-#include <setjmp.h>
+-jmp_buf	env;
+-#define	setexit()	setjmp(env)
+-#define	reset()		longjmp(env, 0)
+-#define TRUE	1
+-#define FALSE	0
+-#define	LBSIZE	512
+-#define RHSIZE	(LBSIZE/4)	/* ed says /2; but that's unreasonable! */
+-#define	NBRA	9
+-#define	EOF	(-1)
+-#define	FILERR	0200
+-#define	SAVENEVER	0
+-#define	SAVEIFFIRST	1
+-#define	SAVEALWAYS	2
+-/*
+- * Stack types.  Must appear in the order as in cspec[]/getchar.
+- * XTTY, GLOB and BRWS are special types with no corresponding special character.
+- * Special is never used directly - it is just used in tracing
+- *	pushinp()/getchar.c can be called with a negative index for cspec[]
+- */
+-char	special[]; /* "xgBbBcfFlprzN\"\\'" */
+-#define	cspec	(special + 3)
+-#define	XTTY		0175
+-#define	GLOB		0176
+-#define	BRWS		0177
+-#define	BUF		0
+-#define	CURBN		1
+-#define	QUOTE		2
+-#define	FILEN		3
+-#define	BFILEN		4
+-#define	TTY		5
+-#define	PAT		6
+-#define	RHS		7
+-#define	STRING		8
+-#define	NEWL		9
+-#define	NOTHING		10
+-#define	BACKSLASH	11
+-#define	LITERAL		12
+-/*
+- * Getchar-linked macros
+- */
+-#define ungetchar(c)	(peekc = (c))
+-#define nextchar()	(peekc = getchar())
+-#define NBUFS 56
+-/*
+- * The buffer structure.  All info associated with each buffer stored here
+- */
+-struct buffer{
+-	int *zero;
+-	int *dot;
+-	int *dol;
+-	char cflag;
+-	char gmark;
+-}buffer[NBUFS];
+-struct buffer *curbuf;
+-/*
+- * The string structure
+- * The first NBUFS strings are the registers
+- * The next NBUFS are the file names
+- * The next two are the saved pattern and saved right hand side
+- * The next is the special register for browsing (the `ob' command)
+- * The next is a file buffer.
+- * Strings are stored in the `strarea' area and garbage collected
+- * when the area is full.  The NSTRCHARS parameter can be increased
+- * if you've got lots of core.
+- * The first two characters of `strarea' form the null string.
+- * The third and subsequent characters are the storage for non null
+- * strings.
+- * The null string has to be stored in this area so that
+- * the R and S commands write out valid pointers to the null string.
+- * The last entry in the string structure is used to store the pointer
+- * to the next free position.
+- * In string.c strfree is defined as "string[NSTRING].str".
+- */
+-#define	NSTRING	(NBUFS+NBUFS+4)
+-#define	COUNT	(26+'C'-'A')
+-#define	TRUTH	(26+'T'-'A')
+-#define	UNIX	(26+'U'-'A')
+-#define	FILE(z)	(NBUFS+(z))
+-#define	SAVPAT	(NBUFS+NBUFS)
+-#define	SAVRHS	(SAVPAT+1)
+-#define	BROWSE	(SAVRHS+1)
+-#define	FILEBUF	(BROWSE+1)
+-struct string{
+-	int len;
+-	char *str;
+-}string[NSTRING+1];
+-#define NSTRCHARS 1024
+-char strarea[NSTRCHARS + 2];
+-#define	nullstr strarea
+-#define	strchars (&strarea[2])
+-#define STACKSIZE 16
+-/*
+- * The getchar stack.
+- */
+-struct stack{
+-	char type;
+-	char literal;
+-	union{
+-		struct buffer *u1bufptr;
+-		char *u1globp;
+-	}u1;
+-	union{
+-		int u2lineno;
+-		int u2strname;
+-	}u2;
+-	int charno;
+-}stack[STACKSIZE];
+-#define	bufptr	u1.u1bufptr
+-#define	globp	u1.u1globp
+-#define	lineno	u2.u2lineno
+-#define	strname	u2.u2strname
+-struct stack *stackp;
+-int	peekc;
+-int	lastc;
+-char	line[70];
+-char	*linp;
+-int	savedfile;
+-char	linebuf[LBSIZE];
+-int	*zero;
+-int	*dot;
+-int	*dol;
+-int 	*lastdol;
+-int	*endcore;
+-int	*fendcore;
+-int	*addr1;
+-int	*addr2;
+-char	genbuf[LBSIZE];
+-char	*linebp;
+-#include	"sgtty.h"
+-struct	sgttyb ttybuf;
+-int	ninbuf;
+-int	io;
+-int	onhup;
+-int	onquit;
+-int	onintr;
+-char	lasterr;
+-#define	PAGESIZE	22
+-extern	pagesize;
+-extern char bformat;	/* = 'p' */
+-int	appflag;
+-int	cflag;
+-int	cprflag;
+-int	dflag;
+-int	eflag;
+-int	gflag;
+-int	biggflag;
+-int	iflag;
+-int	prflag;
+-int	tflag;
+-int	uflag;
+-int	vflag;
+-int	qok;
+-int	eok;
+-int	initflag;
+-int	nestlevel;
+-int	lastttyc;
+-int	listf;
+-int	tfile;
+-char	*tfname;
+-char	*loc1;
+-char	*loc2;
+-int	names[NBUFS];
+-char	*braslist[NBRA];
+-char	*braelist[NBRA];
+-int	nbra;
+-int	oneline;
+-int	lock;
+-char	bname[]; /* ="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~" */
+-char	lchars[];	/* = "pPlL" */
+-int	bbempty;	/* whether getc's internal buffer buffer needs reloading */
+-char	*getline();
+-int	*address();
+-char	*getenv();
+-long	lseek();
+-char	*sbrk();
+//GO.SYSIN DD vars.h
+echo makefile 1>&2
+sed 's/.//' >makefile <<'//GO.SYSIN DD makefile'
+-CFLAGS=-O
+-FILES=\
+-address.o\
+-blkio.o\
+-com.o\
+-getchar.o\
+-getfile.o\
+-glob.o\
+-main.o\
+-misc.o\
+-move.o\
+-pattern.o\
+-putchar.o\
+-setaddr.o\
+-string.o\
+-subs.o
+-a.out:	$(FILES)
+-	cc $(FILES)
+-$(FILES): vars.h
+-print:
+-	@pr vars.h address.c blkio.c com.c getchar.c getfile.c glob.c main.c\
+-	misc.c move.c pattern.c putchar.c setaddr.c string.c subs.c
+//GO.SYSIN DD makefile
+echo q/L.q 1>&2
+sed 's/.//' >q/L.q <<'//GO.SYSIN DD q/L.q'
+-" Left justify addressed lines (default to (1,$))
+-" (Terminating blanks are appended to bring all lines out to same width)
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-\zL,\zMs/^[ 	]*//
+-\zL,\zMs/[ 	]*$//
+-zW:0
+-\zL,\zM g/^/ zI#n<\czW yt zW:\czI
+-zW#>35 yf zW:35
+-zD:                                   |
+-zD)\zW
+-\zL,\zM s/$/\zD/
+-" Turn spaces into periods
+-zD+14
+-\zL,\zM s/^\(\zD\) *$/\1/
+-zD-14
+-\zL,\zM s/\zD$//
+-zL)0 zM)0 zI)0 zD)0 zW)0
+//GO.SYSIN DD q/L.q
+echo q/QLIB 1>&2
+sed 's/.//' >q/QLIB <<'//GO.SYSIN DD q/QLIB'
+-there are two PERIOD lines
+-=====================L.q========================
+-" Left justify addressed lines (default to (1,$))
+-" (Terminating blanks are appended to bring all lines out to same width)
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-\zL,\zMs/^[ 	]*//
+-\zL,\zMs/[ 	]*$//
+-zW:0
+-\zL,\zM g/^/ zI#n<\czW yt zW:\czI
+-zW#>35 yf zW:35
+-zD:                                   |
+-zD)\zW
+-\zL,\zM s/$/\zD/
+-" Turn spaces into periods
+-zD+14
+-\zL,\zM s/^\(\zD\) *$/\1/
+-zD-14
+-\zL,\zM s/\zD$//
+-zL)0 zM)0 zI)0 zD)0 zW)0
+-=====================R.q========================
+-" Right justify addressed lines (default to (1,$))
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-\zL,\zMs/^[ 	]*//
+-\zL,\zMs/[ 	]*$//
+-zW:0
+-\zL,\zM g/^/ zI#n<\czW yt zW:\czI
+-zW#>35 yf zW:35
+-zD:                                   |
+-zD)\zW
+-\zL,\zM s/^/\zD/
+-" Turn spaces into periods
+-zD+14
+-\zL,\zM s/^ *\(\zD\)$/\1/
+-zD-14
+-\zL,\zM s/^\zD//
+-zL)0 zM)0 zI)0 zD)0 zW)0
+-=====================Run========================
+-" Run a qed buffer `off line'
+-z{:\l
+-z{C
+-z{s/$/ /
+-z|'{ z{[/ /
+-z{)\zC z|(\zC z|C
+-" z{: command   z|: argument string   z}: return buffer set by zr
+-b{ E \zq\z{.q
+-ovs
+-b\z} \b{
+-" Note! ok to ZERO buffer ~ (this buffer); the line will finish executing
+-b{Z b~Z
+-=====================col.q========================
+-" Buffer to columnate a buffer of file names, etc.
+-" takes a range of lines; defaults to 1,$
+-zB:\B
+-zL#=\zM yf 1,$zL#r
+-bZ Z
+-b\zB
+-\zL,\zM tZ0
+-" Calculate the width W of the widest line
+-zW#:0
+-g/^/ zM#n>\czW yf zW#:\czM
+-zW#>35 yf'fi
+-	1,$p
+-	yo
+-"fi
+-" L = width of column; C = # of columns
+-zN#:70 zL#:\zW+1 zN#/\zL
+-" now make each line have W spaces
+-zA:                                   |
+-zA)\zW
+-1,$s/$/\zA/
+-" Turn the spaces into periods
+-zA+14
+-1,$s/\(\zA.\).*/\1/
+-" C = number of columns.
+-" L = 1st line of join
+-" M = last line of join
+-$zM#a $zL#a/\zN*\zN+1
+-zL#=\zM yf'else
+-	zM#-1 zL#-\zN
+-	y'fi
+-"else
+-	zL#>\zM yf'else
+-		zL#-\zN
+-		y'fi
+-	"else
+-		\zL,\zM j/ /
+-		zM#:\zL-1
+-		zL#-\zN
+-"fi
+-"do
+-	zL#>0 yf'od
+-		\zL,\zM j/ /
+-		zL#-\zN
+-		zM#-\zN
+-	y`do
+-"od
+-1,$p
+-b\zB
+-" Clean up the variables
+-zA)0 zB)0 zI)0 zL)0 zM)0 zN)0 zW)0
+-=====================divby2========================
+-"This worked the first time!!
+-,s/[0-9]+/|&|/g
+-g/|[0-9]+|/ za/|[0-9]+|/ hf zas/|//g za#/2 s/|[0-9]+|/\ccza/ za//
+-=====================grep.q========================
+-" Grep for z| (possibly set by caller) in all buffers
+-z|=
+-yf'fi
+-	""pattern:" z|:\l
+-"fi
+-G/^[a-zA-Z]/ g/\z|/ ""\cB:" P
+-=====================grepf.q========================
+-" Grep for z| (possibly set by caller) in all buffers
+-" Prints file name as well as buffer name
+-z|=
+-yf'fi
+-	""pattern:" z|:\l
+-"fi
+-G/^[a-zA-Z]/ g/\z|/ ""\cB(\cf):" P
+-=====================man.q========================
+-""	Arguments in [] will be prompted for if missing
+-""        man - print this listing
+-""          L - pad addressed lines with blanks to same length
+-""          R - pad addressed lines to same length with leading  blanks
+-""        col - columnate addressed lines
+-""  grep [RE] - search buffers a-z and A-Z for regular expression
+-"" grepf [RE] - same as grep, but also gives file name in each buffer
+-""multiblanks - replace multiple blanks lines by single ones
+-""   nextfile - load bn with loop to loop through file list in bz
+-""     parens - show parenthesis nesting in addressed lines
+-""        pwd - put pwd output into zd
+-""      qfile - load your qfile into b~  (`qfile -' gets default)
+-""      split - split a line at a numbered blank
+-""   writelen - put length of quoted string into C write call
+-=====================manual========================
+-: Shell command to drive manual.qed
+-qed -i -q -x /usr/qed/q/manual.qed $1 < /dev/tty
+-=====================manual.qed========================
+-" Help to create a manual section
+-" Prompts which leave cursor on same line expect one line of input;
+-"  others take text up to lone . on a line.
+-za:\Fa
+-za=
+-yf'OK
+-	"Usage
+-	""Usage: manual file.n
+-	q
+-"OK
+-	a \za
+-	za/\.[0-9]+$/
+-	za=
+-	yt`Usage
+-bA a
+-"Getline
+-	za:\cl
+-	za=.
+-	yt'done
+-		a \cza
+-	y`Getline
+-"done
+-PERIOD
+-ba
+-"Create the name from the file name
+-	a \Fa
+-	s/\.[0-9]+$//
+-	za/\//
+-	za=
+-	yt s|.*/||
+-	zn.
+-	s/.*/^/
+-	zN.
+-	s/^/.th /
+-""Section number (Roman): "
+-	za:\l
+-""Date: "
+-	zb:\l
+-	a \za \zb
+-	j/ /
+-	a .sh NAME
+-""Brief description: "
+-	a \zn \*- \l
+-""Synopsis: \zn"
+-	a .sh SYNOPSIS
+-	a \cfI\zn\cfP\l
+-""Description:
+-	a .sh DESCRIPTION
+-	\bA
+-""See Also: "
+-	a .sh "SEE ALSO"
+-	a \l
+-""Files: "
+-	a .sh "FILES"
+-	a \l
+-""Diagnostics:
+-	a .sh DIAGNOSTICS
+-	\bA
+-""Author: "
+-	a .sh AUTHOR
+-	a \l
+-""Bugs:
+-	a .sh BUGS
+-	\bA
+-w \Fa
+-q
+-=====================multiblanks.q========================
+-" Multiblanks - convert multiple blank lines to single blank lines
+-" Address defaults to 1,$
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-" By adding blank at end, get all trailing blank lines deleted!
+-\zMa 
+-" Precompile the pattern for efficiency
+-/^$/"
+-\zL,\z#+M g// a \cN hf d zP//
+-zP)0 zL)0 zM)0
+-=====================nextfile.q========================
+-" Nextfile: simple little controller for sequencing through a list of file names
+-bnZ
+-a
+-ba o?c yf w
+-bz +;.zz.
+-bae \czz
+-f
+-PERIOD
+-""Loaded in bn
+-""Put list in bz, . at initial empty line
+-=====================parens.q========================
+-" Parens - show parenthesis level in addressed lines
+-zL#=0 yf'fi
+-	""?$
+-	y'Done
+-"fi
+-zA:\B
+-bAZ
+-b\zA
+-\zL,\zM tA0
+-g/^/.t. s/^/@@/
+-g/^@@/ s/^@@// s/[^()	]/./g
+-zI#:0
+-"Nextline
+-	$zD#a=0 yt'Done
+-	2"
+-	"loop
+-		zB/[()]/ yf'endloop
+-		zB=(
+-		yf'else
+-		"if lpar
+-			zI#+1%10
+-			s//\zI/
+-			y'endif
+-		"else (rpar)
+-			s//\zI/
+-			zI#+9%10
+-		"endif
+-		y`loop
+-	"endloop
+-	1,2p
+-	1,2d
+-	y`Nextline
+-"Done
+-zA)0 zB)0 zI)0 zL)0 zM)0
+-"
+-=====================pwd.q========================
+-" Get current working directory, save it in register d.
+-o?v z{'T
+-b|
+-ovr
+-.<pwd
+-zd.
+-Z
+-zdp
+-z{#=0 yt ovs
+-=====================qfile========================
+-""Qed
+-ob22 oB"""+p
+-zX{TERM} zX=c100\N yf ob22 oB"";"+p
+-	zX=2621\N yf ob22 oB""A"+p
+-zb:G@	\cl@f\cN
+-zc:s@$@	/* \cl */@ p
+-zf:-/^[a-zA-Z_].*(/
+-zg:o?c yf w\cN!com \cf
+-zi:zX/[0-9]+/ s//\cz#+X/p
+-zj:a \cl\cNjp
+-zm:o?c yf w\cN zX:\cf\cN zXs/\..*$/\czS/ ""!make \czX\cN!make \czX
+-zq:/usr/rob/qed/q/
+-zr:zL#r z}:\cB\cN ovr b~E \czqRun\cN \cb~\cN b\cz}
+-zs:s\cl@@\c'r@p
+-zw:s\cl@[A-Za-z0-9]+@\c'l@p
+-zx:s\cl@[A-Za-z0-9]+\_@@p
+-b~Z
+-=====================qfile.help========================
+-Things in qfile:
+-First couple of lines set up the browse register for your TERMinal
+-ons: i like x to always print after a change
+-registers:
+-\zbpat	changes to buffer with file name matching pat
+-\zccom	appends /* com */ to current line
+-\zf	looks for first previous function declaration; try \zf,/^}/>lpr
+-\zg	runs "com" command on current file name
+-\zi	increments first number on line
+-\zjthg	appends thg to end of line
+-\zq	search dir for *.q files
+-\zrbuf	runs the named buffer by reading \zqbuf.q and running it
+-	takes leading addresses; \zrman for details
+-\zs4	repeat previous substitute on 4th thing in line
+-	(usually used as u\zs4)
+-\zw3
+-word	replace 3rd word in line by word
+-\zx3	delete third word in line
+-=====================qfile.q========================
+-" Qfile: load user's qfile into buffer ~ for editing
+-" if z| set, (i.e. via \ zrqfile -) load default
+-" (typically, qfiles zap themselves after execution)
+-bZZ
+-ovr
+-z|=
+-yf'else
+-	zF{QEDFILE}
+-	zF=
+-	yt'else
+-		f \zF
+-		y'fi
+-"else
+-	f /usr/rob/qed/q/qfile
+-"fi
+-r
+-ocr ovs
+-zF:
+-""Do \cbZ when ready
+-"
+-=====================sizes.qed========================
+-bx
+-Z
+-<nm -ng \'Fa
+-yf'OK		" f==0; ok status
+-	""Sizes: nm error
+-	y'Quit
+-"OK
+-zS:Start
+-zL:0
+-1"
+-"Loop
+-	$zA#a#=0 yt'Done
+-	s/ [TDB]//
+-	zN/ .*/
+-	zN(1	" drop blank
+-	s/ .*//
+-	zA.
+-	zB#:0 zP#:1
+-	ht zX#:\czA#%10#*\czP zP#*8 zB#+\czX zA#/10#=0
+-	zX#:\zB#-\zL
+-	""\zX	\zS
+-	zS'N zL'B
+-	d
+-	y`Loop
+-"Done
+-"Quit
+-q
+-
+-
+-=====================split.q========================
+-" Split a line at a numbered blank.
+-" prints out line with blanks numbered, asks where to split
+-zL#=0 yf'fi
+-	""?$
+-	y'out
+-"fi
+-zA:\B
+-bAZ
+-b\zA
+-\zLmA0
+-zz/ /
+-yt'fi
+-	""no blanks in line
+-	y'abort
+-"fi
+-.t.
+-s/[^ 	]/./g
+-zI:`
+-h26f s/ /\cz+I/
+-zI-1 zI=a
+-yf'fi
+-	zI#:1
+-	y'Doit
+-"fi
+-1,$p
+-""[a-\zI]? "
+-zz:\'l
+-zzC
+-zzn
+-zC#=0 yf'fi
+-	""No action taken
+-	y'abort
+-"fi
+-zC#>1 yt'bad
+-zz<a
+-yt'bad
+-zz<\zI
+-yt'notbad
+-"bad
+-	""invalid range
+-	y'abort
+-"notbad
+-" convert \ zz to a number
+-zI#:0
+-ht zI#+1 zz-1 zz<a
+-				"Doit
+-1s\zI/ /\\N/
+-1,.p
+-1,.m\zA.
+-y'out
+-"abort
+-	1m\zA.
+-"out
+-bAZ
+-b\zA
+-zA:
+-zI'A zL'A zM'A
+-yo
+-"
+-=====================sum.q========================
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-zX:0
+-zY:
+-\zL,\zMg/^/ zY. zX#+\czY
+-zXp
+-=====================writelen.q========================
+-" Compute length of message in a Write
+-" take a line of the form
+-"	write(msg
+-" where msg is in double quotes, and create
+-"	write(msg, msglength);
+-zz/".*"/
+-yt'fi
+-	""No quoted string
+-	yo
+-"fi
+-zzs/"\(.*\)"/\1/
+-k~
+-a \zz
+-s/\\././g
+-z~#n
+-d
+-'~ s/$/, \z~);/p
+//GO.SYSIN DD q/QLIB
+echo q/R.q 1>&2
+sed 's/.//' >q/R.q <<'//GO.SYSIN DD q/R.q'
+-" Right justify addressed lines (default to (1,$))
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-\zL,\zMs/^[ 	]*//
+-\zL,\zMs/[ 	]*$//
+-zW:0
+-\zL,\zM g/^/ zI#n<\czW yt zW:\czI
+-zW#>35 yf zW:35
+-zD:                                   |
+-zD)\zW
+-\zL,\zM s/^/\zD/
+-" Turn spaces into periods
+-zD+14
+-\zL,\zM s/^ *\(\zD\)$/\1/
+-zD-14
+-\zL,\zM s/^\zD//
+-zL)0 zM)0 zI)0 zD)0 zW)0
+//GO.SYSIN DD q/R.q
+echo q/Run 1>&2
+sed 's/.//' >q/Run <<'//GO.SYSIN DD q/Run'
+-" Run a qed buffer `off line'
+-z{:\l
+-z{C
+-z{s/$/ /
+-z|'{ z{[/ /
+-z{)\zC z|(\zC z|C
+-" z{: command   z|: argument string   z}: return buffer set by zr
+-b{ E \zq\z{.q
+-ovs
+-b\z} \b{
+-" Note! ok to ZERO buffer ~ (this buffer); the line will finish executing
+-b{Z b~Z
+//GO.SYSIN DD q/Run
+echo q/col.q 1>&2
+sed 's/.//' >q/col.q <<'//GO.SYSIN DD q/col.q'
+-" Buffer to columnate a buffer of file names, etc.
+-" takes a range of lines; defaults to 1,$
+-zB:\B
+-zL#=\zM yf 1,$zL#r
+-bZ Z
+-b\zB
+-\zL,\zM tZ0
+-" Calculate the width W of the widest line
+-zW#:0
+-g/^/ zM#n>\czW yf zW#:\czM
+-zW#>35 yf'fi
+-	1,$p
+-	yo
+-"fi
+-" L = width of column; C = # of columns
+-zN#:70 zL#:\zW+1 zN#/\zL
+-" now make each line have W spaces
+-zA:                                   |
+-zA)\zW
+-1,$s/$/\zA/
+-" Turn the spaces into periods
+-zA+14
+-1,$s/\(\zA.\).*/\1/
+-" C = number of columns.
+-" L = 1st line of join
+-" M = last line of join
+-$zM#a $zL#a/\zN*\zN+1
+-zL#=\zM yf'else
+-	zM#-1 zL#-\zN
+-	y'fi
+-"else
+-	zL#>\zM yf'else
+-		zL#-\zN
+-		y'fi
+-	"else
+-		\zL,\zM j/ /
+-		zM#:\zL-1
+-		zL#-\zN
+-"fi
+-"do
+-	zL#>0 yf'od
+-		\zL,\zM j/ /
+-		zL#-\zN
+-		zM#-\zN
+-	y`do
+-"od
+-1,$p
+-b\zB
+-" Clean up the variables
+-zA)0 zB)0 zI)0 zL)0 zM)0 zN)0 zW)0
+//GO.SYSIN DD q/col.q
+echo q/divby2 1>&2
+sed 's/.//' >q/divby2 <<'//GO.SYSIN DD q/divby2'
+-"This worked the first time!!
+-,s/[0-9]+/|&|/g
+-g/|[0-9]+|/ za/|[0-9]+|/ hf zas/|//g za#/2 s/|[0-9]+|/\ccza/ za//
+//GO.SYSIN DD q/divby2
+echo q/grep.q 1>&2
+sed 's/.//' >q/grep.q <<'//GO.SYSIN DD q/grep.q'
+-" Grep for z| (possibly set by caller) in all buffers
+-z|=
+-yf'fi
+-	""pattern:" z|:\l
+-"fi
+-G/^[a-zA-Z]/ g/\z|/ ""\cB:" P
+//GO.SYSIN DD q/grep.q
+echo q/grepf.q 1>&2
+sed 's/.//' >q/grepf.q <<'//GO.SYSIN DD q/grepf.q'
+-" Grep for z| (possibly set by caller) in all buffers
+-" Prints file name as well as buffer name
+-z|=
+-yf'fi
+-	""pattern:" z|:\l
+-"fi
+-G/^[a-zA-Z]/ g/\z|/ ""\cB(\cf):" P
+//GO.SYSIN DD q/grepf.q
+echo q/mail.q 1>&2
+sed 's/.//' >q/mail.q <<'//GO.SYSIN DD q/mail.q'
+-" bA contains mail file
+-" \Fa is uid
+-" zF is mail file
+-" zM is current message number
+-" zN is number of messages
+-" zX is modified if buffer has been modified
+-" zY is number of lines in original mail file
+-" zZ is number of characters in original mail file
+-zF:/usr/spool/mail/\Fa
+-bA E \zF
+-zZ'C
+-$zY#a
+-g/^From /zN#+1
+-zN#=0 yf'}
+-	""No mail
+-	Q
+-"}
+-" add an extra From line to make things easy
+-$a From 
+-zM'N zM#-1
+-"Loop
+-""? "
+-bA
+-za:\'l
+-bZZ a \za
+-bA
+-za=
+-yf'Nope
+-	zM#+1>\zN yf'Print
+-	""at end of mailbox
+-	zM:\zN
+-	y`Loop
+-"Nope
+-za=d
+-yf'Nope
+-	zx:0
+-	g/^From /zx#+1=\zM yto
+-	.,/^From /-d
+-	zX:modified
+-	zN#-1=0 yt'Quit
+-	zM#>\zN yf zM'N
+-	y`Loop
+-"Nope
+-za=h
+-yf'Nope
+-	" h command: headers
+-	zx:0
+-	g/^From .+/ ""\cz#+x	"p
+-	y`Loop
+-"Nope
+-bZ zx/^m .+/ bA yf'Nope
+-	bBZ bA
+-	zx:0
+-	g/^From /zx#+1=\zM yto 
+-	.,/^From /-tB0
+-	0a Forwarded by \Fa
+-	zas/m //
+-	>mail \za
+-	y`Loop
+-"Nope
+-za=p
+-yf'Nope
+-	zM#>0 yt zM:1
+-	yt'Print
+-"Nope
+-za=q
+-yf'Nope
+-	"Quit
+-	zX=modified
+-	yt'}
+-		" no changes; just quit
+-		zx{HOME} !touch \zx/.../readmail
+-		Q
+-	"}
+-	bA $d " remove that extra From
+-	bBZ E \zF
+-	zC#=\zZ yf'}
+-		" nobody touched it; ok to put file back
+-		"Write
+-		bA w \zF
+-		zx{HOME} !touch \zx/.../readmail
+-		Q
+-	"}
+-	""new mail arrived
+-	" if the file is shorter this will intentionally crap out and
+-	" drop you into qed
+-	\zY+1,$tA$
+-	y`Write
+-"Nope
+-za=r
+-yf'Nope
+-	zx:0
+-	g/^From /zx#+1=\zM yto 
+-	za. zas/From \([^ ]*\) .*/\1/
+-	bBZ
+-	a To: \za
+-	"{
+-		zx:\'l
+-		zx=.
+-		yt'Sendit
+-		zx=.e
+-		yt'Editit
+-		a \zx
+-		y`{
+-	"}
+-"Nope
+-za=R
+-yf'Nope
+-	bBZ bA
+-	zx:0
+-	g/^From /zx#+1=\zM yto 
+-	.,/^From /-tB0
+-	1" " za. zas/From \([^ ]*\) .*/\1/
+-	1c To: \za
+-    "Editit
+-	zx#P
+-	w /tmp/m\zx
+-	!qed /tmp/m\zx
+-	E /tmp/m\zx
+-	!rm -f /tmp/m\zx
+-    "Sendit
+-	1" " za. d zas/To: // za=
+-		yf'}
+-		""reply aborted
+-		y`Loop
+-	"}
+-	>mail \za
+-	yf	""reply saved in bB
+-	y`Loop
+-"Nope
+-bZ zx/^s.*/ bA yf'Nope
+-	zxs/s \(.*\)/\1/ yt zx{HOME} zx:\zx/mbox
+-	zy:0
+-	g/^From /zy#+1=\zM yto 
+-	.,/^From /- W \zx
+-	y`Loop
+-"Nope
+-za=x
+-yf'Nope
+-	zx{HOME} !touch \zx/.../readmail
+-	Q
+-"Nope
+-bZ zx/^[0-9]+/ bA yf'Nope
+-	" message chosen by number
+-	za#>\zN yf'}
+-		""only \zN messages
+-		y`Loop
+-	"}
+-	zM'a
+-	y'Print
+-"Nope
+-bZ zx/^-[0-9]*/ bA yf'Nope
+-	" back up some number of messages
+-	za#:-\za=0 yf za:1
+-	zx#:\zN-\za<1 yf'}
+-		""beyond beginning of mailbox
+-		y`Loop
+-	"}
+-	zM'x
+-	y'Print
+-"Nope
+-bZ zx/^!.*/ bA yf'Nope
+-	\za
+-	y`Loop
+-"Nope
+-	y`Loop
+-
+-"Print
+-	zx:0
+-	g/^From /zx#+1=\zM yto 
+-	.,/^From /- > cat
+-	y`Loop
+-
+//GO.SYSIN DD q/mail.q
+echo q/man.q 1>&2
+sed 's/.//' >q/man.q <<'//GO.SYSIN DD q/man.q'
+-""	Arguments in [] will be prompted for if missing
+-""        man - print this listing
+-""          L - pad addressed lines with blanks to same length
+-""          R - pad addressed lines to same length with leading  blanks
+-""        col - columnate addressed lines
+-""  grep [RE] - search buffers a-z and A-Z for regular expression
+-"" grepf [RE] - same as grep, but also gives file name in each buffer
+-""multiblanks - replace multiple blanks lines by single ones
+-""   nextfile - load bn with loop to loop through file list in bz
+-""     parens - show parenthesis nesting in addressed lines
+-""        pwd - put pwd output into zd
+-""      qfile - load your qfile into b~  (`qfile -' gets default)
+-""      split - split a line at a numbered blank
+-""   writelen - put length of quoted string into C write call
+//GO.SYSIN DD q/man.q
+echo q/manual 1>&2
+sed 's/.//' >q/manual <<'//GO.SYSIN DD q/manual'
+-: Shell command to drive manual.qed
+-qed -i -q -x /usr/qed/q/manual.qed $1 < /dev/tty
+//GO.SYSIN DD q/manual
+echo q/manual.qed 1>&2
+sed 's/.//' >q/manual.qed <<'//GO.SYSIN DD q/manual.qed'
+-" Help to create a manual section
+-" Prompts which leave cursor on same line expect one line of input;
+-"  others take text up to lone . on a line.
+-za:\Fa
+-za=
+-yf'OK
+-	"Usage
+-	""Usage: manual file.n
+-	q
+-"OK
+-	a \za
+-	za/\.[0-9]+$/
+-	za=
+-	yt`Usage
+-bA a
+-"Getline
+-	za:\cl
+-	za=.
+-	yt'done
+-		a \cza
+-	y`Getline
+-"done
+-.
+-ba
+-"Create the name from the file name
+-	a \Fa
+-	s/\.[0-9]+$//
+-	za/\//
+-	za=
+-	yt s|.*/||
+-	zn.
+-	s/.*/^/
+-	zN.
+-	s/^/.th /
+-""Section number (Roman): "
+-	za:\l
+-""Date: "
+-	zb:\l
+-	a \za \zb
+-	j/ /
+-	a .sh NAME
+-""Brief description: "
+-	a \zn \*- \l
+-""Synopsis: \zn"
+-	a .sh SYNOPSIS
+-	a \cfI\zn\cfP\l
+-""Description:
+-	a .sh DESCRIPTION
+-	\bA
+-""See Also: "
+-	a .sh "SEE ALSO"
+-	a \l
+-""Files: "
+-	a .sh "FILES"
+-	a \l
+-""Diagnostics:
+-	a .sh DIAGNOSTICS
+-	\bA
+-""Author: "
+-	a .sh AUTHOR
+-	a \l
+-""Bugs:
+-	a .sh BUGS
+-	\bA
+-w \Fa
+-q
+//GO.SYSIN DD q/manual.qed
+echo q/multiblanks.q 1>&2
+sed 's/.//' >q/multiblanks.q <<'//GO.SYSIN DD q/multiblanks.q'
+-" Multiblanks - convert multiple blank lines to single blank lines
+-" Address defaults to 1,$
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-" By adding blank at end, get all trailing blank lines deleted!
+-\zMa 
+-" Precompile the pattern for efficiency
+-/^$/"
+-\zL,\z#+M g// a \cN hf d zP//
+-zP)0 zL)0 zM)0
+//GO.SYSIN DD q/multiblanks.q
+echo q/nextfile.q 1>&2
+sed 's/.//' >q/nextfile.q <<'//GO.SYSIN DD q/nextfile.q'
+-" Nextfile: simple little controller for sequencing through a list of file names
+-bnZ
+-a
+-ba o?c yf w
+-bz +;.zz.
+-bae \czz
+-f
+-.
+-""Loaded in bn
+-""Put list in bz, . at initial empty line
+//GO.SYSIN DD q/nextfile.q
+echo q/parens.q 1>&2
+sed 's/.//' >q/parens.q <<'//GO.SYSIN DD q/parens.q'
+-" Parens - show parenthesis level in addressed lines
+-zL#=0 yf'fi
+-	""?$
+-	y'Done
+-"fi
+-zA:\B
+-bAZ
+-b\zA
+-\zL,\zM tA0
+-g/^/.t. s/^/@@/
+-g/^@@/ s/^@@// s/[^()	]/./g
+-zI#:0
+-"Nextline
+-	$zD#a=0 yt'Done
+-	2"
+-	"loop
+-		zB/[()]/ yf'endloop
+-		zB=(
+-		yf'else
+-		"if lpar
+-			zI#+1%10
+-			s//\zI/
+-			y'endif
+-		"else (rpar)
+-			s//\zI/
+-			zI#+9%10
+-		"endif
+-		y`loop
+-	"endloop
+-	1,2p
+-	1,2d
+-	y`Nextline
+-"Done
+-zA)0 zB)0 zI)0 zL)0 zM)0
+-"
+//GO.SYSIN DD q/parens.q
+echo q/pwd.q 1>&2
+sed 's/.//' >q/pwd.q <<'//GO.SYSIN DD q/pwd.q'
+-" Get current working directory, save it in register d.
+-o?v z{'T
+-b|
+-ovr
+-.<pwd
+-zd.
+-Z
+-zdp
+-z{#=0 yt ovs
+//GO.SYSIN DD q/pwd.q
+echo q/qfile 1>&2
+sed 's/.//' >q/qfile <<'//GO.SYSIN DD q/qfile'
+-""Qed
+-ob22 oB"""+p
+-zX{TERM} zX=c100\N yf ob22 oB"";"+p
+-	zX=2621\N yf ob22 oB""A"+p
+-zb:G@	\cl@f\cN
+-zc:s@$@	/* \cl */@ p
+-zf:-/^[a-zA-Z_].*(/
+-zg:o?c yf w\cN!com \cf
+-zi:zX/[0-9]+/ s//\cz#+X/p
+-zj:a \cl\cNjp
+-zm:o?c yf w\cN zX:\cf\cN zXs/\..*$/\czS/ ""!make \czX\cN!make \czX
+-zq:/usr/rob/qed/q/
+-zr:zL#r z}:\cB\cN ovr b~E \czqRun\cN \cb~\cN b\cz}
+-zs:s\cl@@\c'r@p
+-zw:s\cl@[A-Za-z0-9]+@\c'l@p
+-zx:s\cl@[A-Za-z0-9]+\_@@p
+-b~Z
+//GO.SYSIN DD q/qfile
+echo q/qfile.help 1>&2
+sed 's/.//' >q/qfile.help <<'//GO.SYSIN DD q/qfile.help'
+-Things in qfile:
+-First couple of lines set up the browse register for your TERMinal
+-ons: i like x to always print after a change
+-registers:
+-\zbpat	changes to buffer with file name matching pat
+-\zccom	appends /* com */ to current line
+-\zf	looks for first previous function declaration; try \zf,/^}/>lpr
+-\zg	runs "com" command on current file name
+-\zi	increments first number on line
+-\zjthg	appends thg to end of line
+-\zq	search dir for *.q files
+-\zrbuf	runs the named buffer by reading \zqbuf.q and running it
+-	takes leading addresses; \zrman for details
+-\zs4	repeat previous substitute on 4th thing in line
+-	(usually used as u\zs4)
+-\zw3
+-word	replace 3rd word in line by word
+-\zx3	delete third word in line
+//GO.SYSIN DD q/qfile.help
+echo q/qfile.q 1>&2
+sed 's/.//' >q/qfile.q <<'//GO.SYSIN DD q/qfile.q'
+-" Qfile: load user's qfile into buffer ~ for editing
+-" if z| set, (i.e. via \ zrqfile -) load default
+-" (typically, qfiles zap themselves after execution)
+-bZZ
+-ovr
+-z|=
+-yf'else
+-	zF{QEDFILE}
+-	zF=
+-	yt'else
+-		f \zF
+-		y'fi
+-"else
+-	f /usr/rob/qed/q/qfile
+-"fi
+-r
+-ocr ovs
+-zF:
+-""Do \cbZ when ready
+-"
+//GO.SYSIN DD q/qfile.q
+echo q/sizes.qed 1>&2
+sed 's/.//' >q/sizes.qed <<'//GO.SYSIN DD q/sizes.qed'
+-bx
+-Z
+-<nm -ng \'Fa
+-yf'OK		" f==0; ok status
+-	""Sizes: nm error
+-	y'Quit
+-"OK
+-zS:Start
+-zL:0
+-1"
+-"Loop
+-	$zA#a#=0 yt'Done
+-	s/ [TDB]//
+-	zN/ .*/
+-	zN(1	" drop blank
+-	s/ .*//
+-	zA.
+-	zB#:0 zP#:1
+-	ht zX#:\czA#%10#*\czP zP#*8 zB#+\czX zA#/10#=0
+-	zX#:\zB#-\zL
+-	""\zX	\zS
+-	zS'N zL'B
+-	d
+-	y`Loop
+-"Done
+-"Quit
+-q
+-
+-
+//GO.SYSIN DD q/sizes.qed
+echo q/split.q 1>&2
+sed 's/.//' >q/split.q <<'//GO.SYSIN DD q/split.q'
+-" Split a line at a numbered blank.
+-" prints out line with blanks numbered, asks where to split
+-zL#=0 yf'fi
+-	""?$
+-	y'out
+-"fi
+-zA:\B
+-bAZ
+-b\zA
+-\zLmA0
+-zz/ /
+-yt'fi
+-	""no blanks in line
+-	y'abort
+-"fi
+-.t.
+-s/[^ 	]/./g
+-zI:`
+-h26f s/ /\cz+I/
+-zI-1 zI=a
+-yf'fi
+-	zI#:1
+-	y'Doit
+-"fi
+-1,$p
+-""[a-\zI]? "
+-zz:\'l
+-zzC
+-zzn
+-zC#=0 yf'fi
+-	""No action taken
+-	y'abort
+-"fi
+-zC#>1 yt'bad
+-zz<a
+-yt'bad
+-zz<\zI
+-yt'notbad
+-"bad
+-	""invalid range
+-	y'abort
+-"notbad
+-" convert \ zz to a number
+-zI#:0
+-ht zI#+1 zz-1 zz<a
+-				"Doit
+-1s\zI/ /\\N/
+-1,.p
+-1,.m\zA.
+-y'out
+-"abort
+-	1m\zA.
+-"out
+-bAZ
+-b\zA
+-zA:
+-zI'A zL'A zM'A
+-yo
+-"
+//GO.SYSIN DD q/split.q
+echo q/sum.q 1>&2
+sed 's/.//' >q/sum.q <<'//GO.SYSIN DD q/sum.q'
+-zL#=\zM yf'fi
+-	1,$zL#r
+-"fi
+-zX:0
+-zY:
+-\zL,\zMg/^/ zY. zX#+\czY
+-zXp
+//GO.SYSIN DD q/sum.q
+echo q/writelen.q 1>&2
+sed 's/.//' >q/writelen.q <<'//GO.SYSIN DD q/writelen.q'
+-" Compute length of message in a Write
+-" take a line of the form
+-"	write(msg
+-" where msg is in double quotes, and create
+-"	write(msg, msglength);
+-zz/".*"/
+-yt'fi
+-	""No quoted string
+-	yo
+-"fi
+-zzs/"\(.*\)"/\1/
+-k~
+-a \zz
+-s/\\././g
+-z~#n
+-d
+-'~ s/$/, \z~);/p
+//GO.SYSIN DD q/writelen.q

@@ -1,0 +1,2 @@
+: Shell command to drive manual.qed
+qed -i -q -x /usr/qed/q/manual.qed $1 < /dev/tty

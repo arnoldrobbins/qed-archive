@@ -1,0 +1,1617 @@
+.TH "QED" 1 Mar/82
+.	\" /*% nroff -man %
+.if t .ds q \(aa
+.if n .ds q '
+.SH NAME
+qed \- multi-file text editor
+.SH SYNOPSIS
+.B qed
+[
+.B \-
+] [
+.B \-i
+] [
+.B \-q
+] [
+.B \-e
+] [
+.B \-x
+startupfile
+] [ filename1 filename2 ... ]
+.SH DESCRIPTION
+\fIQed\fP
+is a multiple-file programmable text editor based on
+.IR ed .
+.PP
+.I Qed
+operates on a copy of any file it is editing; changes made
+in the copy have no effect on the file until a \fIw\fR
+or \fIW\fR (write)
+command is given.
+The copy of the text being edited resides
+in a scratch area called a
+.I buffer.
+There are 56 buffers, labeled by alphabetics `a' to `z' and `A' to `Z',
+and the characters `{', `|', `}' and `~'
+(the four ASCII characters following `z').
+These 56 characters are called, for notational efficiency,
+.I bnames.
+The buffers can contain any ASCII character except NUL.
+.PP
+If
+.I file
+arguments are given,
+.I qed
+simulates an
+.I r
+command (see below) on each of the named files; that is to say,
+the files are read into
+.I qed's
+buffers so that they can be edited.
+The first is read into buffer `a', the second into buffer `b',
+through `z',
+then from `A' to `Z',
+up to a maximum of 52 files.
+The optional
+.B \-
+puts
+.I qed
+in non-\c
+.I verbose
+mode (described with the
+.I o
+command).
+The
+\fB\-q\fR, \fB\-e\fR
+and
+.B \-i
+are equivalent to performing an initial
+`oqs', `oes' or `ois' command (see the
+.I o
+command below).
+.PP
+When \fIqed\fP starts up,
+the file named by the environment variable
+.B QEDFILE
+is read into
+buffer `~' and executed
+(i.e. read as command input), before
+reading in files and accepting commands from the terminal.
+The argument
+.I filename\c
+s are set in the buffers before the startup file is executed,
+so the startup file can treat the \fIfilenames\fR as arguments.
+The default startup file may be overridden with the \fB\-x\fR option.
+.PP
+Input to
+.I qed
+can be redirected, at any time,
+to come from storage such as a buffer
+by use of a
+.I special
+.I character
+such as ``\eb''.
+All the
+.I qed special character
+sequences are discussed in detail below;
+they all begin with a
+backslash `\\'.
+.PP
+.I Qed
+has a 
+.I truth flag
+which is set according to the success of certain commands
+and which can be tested for conditional execution, and a
+.I count
+which is set to such values as the number of successful substitutions
+performed in an
+.I s
+command.
+Each buffer has associated with it a
+(possibly null) filename and a
+.I changed
+flag, which is
+set if the contents of the buffer are known to differ
+from the contents of the named file in that buffer.
+.PP
+Commands to
+.I qed
+have a simple and regular structure: zero or
+more
+.I addresses
+followed by a single character
+\fIcommand\fP,
+possibly
+followed by parameters to the command.
+These addresses specify one or more lines in the buffer.
+Every command which requires addresses has default addresses,
+so that the addresses can often be omitted.
+.PP
+In general, any number of commands can appear on a line.
+Some commands require that the character following
+the command be a separator, such as blank, tab or newline.
+Usually, a
+.I display
+.IR character ,
+.IR p ,
+.IR P ,
+.IR l ,
+or
+.I L
+may precede the separator,
+causing the resulting line to be displayed in the specified format
+after the command.
+Certain commands allow the input of text for placement in the buffer.
+This text can be supplied in two forms:
+either
+on the same line, after the command,
+or on lines following the command,
+terminated by a line containing only a period `\fB.\fP'.
+If the text is on the command line,
+it is separated from the command by a space or a tab.
+If the tab is used, it is considered part of the text.
+.PP
+.I Qed
+supports a limited form of
+\fIregular\fP \fIexpression\fP
+notation.
+A regular expression specifies
+a set of strings of characters.
+A member of this set of strings is said to be
+.I matched
+by the regular expression.
+Regular expressions in
+.I qed
+are delimited by enclosing them in a pair of identical characters,
+frequently slashes `/'.
+In the following specification for regular expressions the word `character'
+means any character but newline.
+Note that special character interpretation always occurs
+.I before
+executing a command.
+Thus, the backslashes mentioned below are those present
+after special characters have been interpreted.
+.IP 1.
+Any character except a metacharacter matches itself.
+Metacharacters are the regular expression delimiter plus
+< [ \fB.\fP and \e | > ^ * \+ $
+when another rule gives them a meaning.
+.IP 2.
+A \fB.\fP matches any character.
+.IP 3.
+A backslash \\ followed by
+any metacharacter in the list given in rule 1
+is a regular expression and matches that character.
+A backslash followed by one of
+! _ { } (  )
+or a non-zero digit
+has a special meaning discussed below;
+otherwise, backslashes have literal meaning in regular expressions.
+.IP 4.
+The metacharacter \e\|! matches any control character
+except tab or newline.
+.IP 5.
+A non-empty string
+.I s
+enclosed in square brackets
+[\fIs\fP] (or [^\fIs\fP]) matches any character in (or not in) \fIs\fP.
+In
+.IR s ,
+\\ has no special meaning, and ] may only appear as the first character.
+A substring
+.IR a \- b ,
+with
+.I a
+and
+.I b
+in ascending ASCII order, stands for the inclusive range of ASCII characters.
+.IP 6.
+A regular expression,
+of the form <\fIx1\fP> or <\fIx1\fR|\|\fIx2\fR|\|...|\|\fIxn\fR>,
+where the \fIx\fR's are regular expressions of form 1-12, matches what
+the leftmost successful \fIx\fR
+matches.
+.IP 7.
+A backslash followed by a non-zero digit
+.I n
+matches a copy of the string that the bracketed regular expression
+(see rule 11)
+beginning with the \fIn\fPth \e\|( matched.
+.IP 8.
+A regular expression of form 1-7 followed by * (\+)
+matches a sequence of zero (one) or more matches of the regular expression.
+.IP 9.
+The metacharacter \\\|_ matches a non-empty
+maximal-length sequence of blanks and tabs.
+.IP 10.
+The metacharacter \\\|{ (\\\|}) matches the empty string at the beginning
+(end) of an identifier.  An identifier is defined to be
+an underscore _ or alphabetic followed by zero or more
+underscores, alphabetics or digits.
+.IP 11.
+A regular expression,
+.IR x ,
+of form 1-12, bracketed \e\|(\|\fIx\fP\|\e\|) matches what
+.I x
+matches.
+The nesting of these brackets in each regular expression of an
+alternation (rule 6) must be identical.
+An alternation with these brackets may not be iterated (rule 8).
+.IP 12.
+A regular expression of form 1-12,
+.IR x ,
+followed by a regular expression of form 1-11,
+.IR y ,
+matches a match for
+.I x
+followed by a match for
+.IR y ,
+with the
+.I x
+match being as long as possible while still permitting a
+.I y
+match.
+.IP 13.
+A regular expression of form 1-12 preceded by ^ (followed by $) is constrained
+to matches that begin at the left (end at the right) end of a line.
+.IP 14.
+A regular expression of form 1-13 picks out the longest among the leftmost matches
+in a line.
+.IP 15.
+An empty regular expression stands for a copy of the last regular expression encountered.
+.PP
+.i0
+Regular expressions are used in addresses and the
+.I g
+and
+.I v
+commands
+to specify
+lines, in the
+.I s
+command
+to specify a portion of a line which is to be replaced,
+in the
+.I G
+and
+.I V
+commands to refer to buffers in which to perform commands,
+and in general whenever text
+is being specified.
+.PP
+To understand addressing in
+.I qed
+it is necessary to know that at any time there is a
+\fIcurrent buffer\fR
+and a
+\fIcurrent line.\fR
+When
+.I qed
+is invoked,
+the current buffer is
+buffer `a',
+but may be changed at any time by a
+.I b
+(change buffer) command.
+All addresses refer to lines in the current buffer,
+except for a special case described under the
+.I m
+(move) command.
+.PP
+Generally speaking, the current line is
+the last line affected by a command; however,
+the exact effect on the current line
+is discussed under the description of
+the command.
+Addresses are constructed as follows.
+.IP 1.
+The character `\fB.\fR' addresses the current line.
+.IP 2.
+The character `$' addresses the last line of the buffer.
+.IP 3.
+A decimal number
+.I n
+addresses the
+\fIn\fR-th
+line of the buffer.
+.IP 4.
+`\*q\fIx\fR' addresses the line marked with the
+mark name character \fIx\fR,
+which must be a bname.
+Lines are marked with the
+.I k
+command described below.
+It is an error for the marked line to be outside of the current buffer.
+.IP 5.
+A regular expression enclosed in slashes `/' addresses
+the first matching line
+found by searching forwards from the line after the current line.
+If necessary, the search wraps around to the beginning of the
+buffer.
+If the trailing `/' would be followed by a newline,
+it may be omitted.
+.IP 6.
+A regular expression enclosed in queries `?' addresses
+the first matching line
+found by searching backwards from the line before
+the current line.
+If necessary
+the search wraps around to the end of the buffer.
+If the trailing `?' would be followed by a newline,
+it may be omitted.
+.IP 7.
+An address followed by a plus sign `+'
+or a minus sign `\-' followed by a decimal number specifies that address plus
+(resp. minus) the indicated number of lines.
+The plus sign may be omitted.
+.IP 8.
+An address followed by `+' or `\-' followed by a
+regular expression enclosed in slashes specifies the first
+matching line following (resp. preceding) that address.
+The search wraps around if necessary.
+The `+' may be omitted.
+Enclosing the regular expression in `?' reverses the search direction.
+.IP 9.
+If an address begins with `+' or `\-'
+the addition or subtraction is taken with respect to the current line;
+e.g. `\-5' is understood to mean `\fB.\fR\-5'.
+.IP 10.
+If an address ends with a `+' (or `\-') 1 is added (resp. subtracted).
+As a consequence of this rule and rule 9,
+the address `\-' refers to the line before the current line.
+Moreover, trailing `+' and `\-' characters have cumulative effect, so `\-\-'
+refers to the current line less 2.
+.IP 11.
+To maintain compatibility with earlier versions of the editor,
+the character `^' in addresses is entirely
+equivalent to `\-'.
+.PP
+.i0
+Commands may require zero, one, or two addresses.
+Commands which require no addresses regard the presence
+of an address as an error.
+Commands which accept one or two addresses
+assume default addresses when none is given.
+If more addresses are given than the command requires,
+the last one or two (depending on what is accepted) are used.
+The last addressed line must not precede the second-last addressed line.
+.PP
+Typically, addresses are separated from each other by a comma `,'.
+They may instead be separated by a semicolon `;'
+in which case the current line `\fB.\fR' is set to the first address
+before the second address is interpreted.
+The second of two separated addresses may not be a line
+earlier in the buffer than the first.
+If the address on the left (right) side of a comma or semicolon
+is absent, it defaults to the first (resp. last) line.
+.PP
+Filename operands of commands may be made up of printing characters only.
+However, when the filename appears as the argument to the invocation of
+\fIqed\fP,
+non-printing characters may be included.
+When a filename is specified for a command,
+it is terminated at the first blank, tab or newline.
+.PP
+In the following list of
+.I qed
+commands, the default addresses
+are shown in parentheses.
+The parentheses are not part of
+the address, but are used to show that the given addresses are
+the default.
+.TP 5
+( \fB. \fR)\|a <text>
+The append command accepts input text
+and appends it after the addressed line.
+`\fB.\fR' is left
+on the last line input, if there
+were any, otherwise at the addressed line.
+Address `0' is legal for this command; text is placed
+at the beginning of the buffer.
+.TP 5
+b<bname>
+The change buffer command sets the current buffer
+to be that named.
+`\fB.\fR', `$' and the remembered
+.I filename
+are set to those of the new buffer;
+upon return to a previously used buffer,
+`\fB.\fR' will be set to its value when the buffer was last used.
+.TP 5
+( \fB. \fR)\|b[+\-\^\fB.\fP\^][pagesize][display character]
+The browse command provides page-oriented printing.
+The optional `+', `\-', or
+.RB ` . '
+specifies whether the next,
+previous,
+or surrounding page
+is to be printed; if absent, `+' is assumed.
+.IB b .
+also prints several carets `^^^^^'
+immediately below the current line.
+If a pagesize is given, it is used for the current browse
+command and remembered as the default.
+The pagesize is initially 22 lines.
+If a display character is given,
+the lines are printed in the specified format,
+and the format is remembered as the default.
+Initially, `p' is the default.
+For
+.I b+
+and
+.IR b\- ,
+`\fB.\fP' is left at the last line displayed;
+for
+\fIb\fP\fB.\fP,
+it is unchanged.
+NOTE: The browse and change buffer commands are the same character!
+The two commands can be syntactically distinguished
+in all cases except for `b<display\ char>';
+this ambiguity may be resolved by typing the (implicit) `+'
+after the `b'.
+.TP 5
+( \fB. \fR, \fB. \fR)\|c <text>
+The change
+command deletes the addressed lines, then accepts input
+text which replaces these lines.
+`\fB.\fR' is left at the last line input; if there were none,
+it is left at the line preceding the deleted lines.
+If an interrupt signal (usually ASCII DEL) is received during a
+change command, the old lines are not deleted.
+.TP 5
+( \fB. \fR, \fB. \fR)\|d
+The delete command deletes the addressed lines from the buffer.
+The line after the deleted section becomes the current line;
+if the deleted lines were originally at the end,
+the new last line becomes the current line.
+The character after the `d' can only be one of
+a blank, newline, tab, or display character.
+Line 0 is a valid address for deletion;
+deleting line 0 has no affect on any lines in the buffer.
+.TP 5
+e filename
+The edit
+command causes the entire contents of the current buffer to be deleted,
+and then the named file to be read in.
+`\fB.\fR' is set to the last line of the buffer.
+The number of characters read is typed
+if
+.I qed
+is in
+.I verbose
+mode.
+The \fIfilename\fP is remembered for possible use as a default file name
+in a subsequent
+\fIf\fP, \fIr\fR, \fIw\fR, or \fIW\fR command.
+.TP 5
+E filename
+The
+.I E
+command is like
+.IR e ,
+except that
+.I qed
+does not check to see
+if the buffer has been modified
+since the last
+.I w
+command.
+.TP 5
+f filename
+The filename command prints information about the current buffer,
+in the format used by the \fIn\fR command.
+If \fIfilename\fP is given,
+the currently remembered file name is changed to \fIfilename\fP.
+If
+.I qed
+is not in verbose mode,
+the information is only printed if the
+.I filename
+is not specified.
+If it is not desired to set the
+.I filename,
+the character immediately after the f must be a newline.
+Otherwise, the first token
+(which may be the null string)
+on the line, after a mandatory non-empty sequence of blanks and tabs,
+is taken to be the
+.I filename.
+These rules apply to all
+.I filename\c
+-using commands,
+.I e,
+.I f,
+.I r,
+.I R,
+.I S,
+.I w
+and
+.I W,
+although some regard specification of an explicitly null \fIfilename\fP as an
+error.
+.TP 5
+( 1 , $ )\|g/regular expression/command list
+In the global
+command, the first step is to mark every line in the range which matches
+the regular expression.
+Then for every such line, the
+command list is executed with `\fB.\fR' initially set to that line.
+Any embedded newlines in the command list
+must be escaped with a backslash.
+The
+\fIa\fP,
+\fIi\fP,
+and
+.I c
+commands and associated input are permitted;
+the `\fB.\fR' terminating input mode may be omitted if it would be on the
+last line of the command list.
+The commands
+.I g
+and
+.I v
+are not permitted in the command list.
+If the command list is empty, `\fB.\fPp' is assumed.
+The regular expression may be delimited by any character other than newline.
+.TP 5
+G/regular expression/command list
+In the globuf
+command, the first step is to mark every active buffer
+whose output from an
+.I f
+command
+(with the
+.I filename
+printed literally)
+would match the regular expression.
+(An active buffer is one which has either some text or
+a remembered file name.)\ 
+Then for every such buffer, the
+command list is executed with the current buffer set to that buffer.
+In other respects it is like the global command,
+except that only the commands
+.I G
+and
+.I V
+are not permitted in the command list.
+If the command list is empty, `f' is assumed.
+.TP 5
+h<option> command list
+The until command provides a simple looping mechanism.
+The command list is a newline-terminated command sequence which forms
+the body of the loop; embedded newlines must be escaped with a backslash.
+The option specifies the exit condition for the loop,
+and is specified by the character(s) immediately following the `h':
+.RS
+.IP h[\fIN\fP]t 6
+The loop is executed until the truth flag is true.
+.PD 0
+.IP h[\fIN\fP]f 6
+The loop is executed until the truth flag is false.
+.IP h[\fIN\fP] 6
+The loop is executed indefinitely.
+.RE
+.PD
+.IP
+The loop condition is tested
+.I after
+execution, so the `ht' and `hf' forms execute at least once.
+.I N
+denotes an optional non-negative number which indicates the
+maximum number of times to execute the loop.
+.TP 5
+( \fB. \fR)\|i <text>
+The insert command accepts input text
+and inserts it before the addressed line.
+`\fB.\fR' is left at the last line input; if there were none,
+at the line before the addressed line.
+This command differs from the
+.I a
+command only in the placement of the
+text.
+.TP 5
+( \fB.\fR\-1 , \fB. \fR)\|j
+.PD 0
+.TP 5
+( \fB.\fR\-1 , \fB. \fR)\|j\|/replacement/
+.PD
+The join command collapses all addressed lines into a single line by
+deleting intermediate newlines.
+The
+.I replacement
+(if any) is placed between joined lines.
+Newlines, backslashes `\\', and slashes `/' within
+.I replacement
+must be preceded by a backslash.
+Only slashes may delimit \fIreplacement\fP.
+`\fB.\fP' is left at the resulting line.
+NOTE: The join command in
+.I qed
+has a different default addressing from that in
+.I ed.
+.TP 5
+( \fB. \fR)\|k<bname>
+The mark command marks the addressed line with
+the given bname.
+(The bname used in the mark has no relation to any buffer;
+it is just a label.)\ 
+The address form `\*q<bname>'
+then addresses this line.
+`\fB.\fR' is not changed.
+The marks are global to
+.I qed\c
+; marking a line `x' erases any previous mark `x' in any buffer.
+.TP 5
+( \fB. \fR, \fB. \fR)\|l
+The list command
+prints the addressed lines in an unambiguous way:
+a tab is printed as `\et', a backspace as `\\b',
+a backslash as `\e\e',
+a non-printing character is
+printed as a backslash followed by three octal digits,
+and a long line is folded,
+with the second and subsequent sub-lines indented one tab stop.
+If the last character in the line is a blank,
+it is followed by `\\n'.
+.TP 5
+( \fB. \fR, \fB. \fR)\|L
+The \fIL\fP command
+is similar to the \fIl\fP command,
+but each line displayed is preceded by its line number,
+any marks it has (which appear as `\*q\fIx\fR'),
+and a tab.
+.TP 5
+( \fB. \fR, \fB. \fR)\|m\fIa\fR
+The move command repositions the addressed lines after the line
+addressed by
+\fIa\fP.
+The last of the moved lines becomes the current line.
+The address \fIa\fP can also be of the form
+<bname>address,
+in which case the text is moved after the address in the named
+buffer.
+The buffer to which the text was moved becomes the current buffer.
+The original buffer (if different) has `\fB.\fR' left at the line before the moved lines.
+.TP 5
+n
+The names command displays the bname,
+dollar
+and \fIfilename\fR (in `l' format) of the current buffer and all active buffers.
+If the buffer's changed flag is set, an apostrophe `\*q' is printed
+after the bname.
+The current buffer is indicated by a period `\fB.\fP' before the
+dollar value.
+If present, the
+.I filename
+is preceded by a tab.
+.TP 5
+N
+The \fIN\fP command is similar to the \fIn\fP command,
+but the display is only given for those buffers
+which have a \fIfilename\fP and for which the changed flag is set.
+.TP 5
+o\fIps\fP
+The option command allows various options to be set.
+The first argument, \fIp\fP,
+specifies which option is being set.
+The rest of the command, \fIs\fP,
+specifies the setting.
+Most options can be either enabled or disabled;
+\fIs\fP is `s' to set the option,
+or `r' to reset it.
+The following table describes the available options.
+The default setting is shown after the option's letter.
+.RS
+.IP b22p 5
+Set the length and format of the page printed by the browse command.
+Either the length or the format may be omitted.
+.PD 0
+.IP "B<null string>" 5
+Set the default command sequence to be
+performed when a newline command is typed at the terminal.
+The command sequence is set by following the `B' with a newline-terminated
+string.
+If the string is null, the newline command resumes its default behaviour.
+.IP cr 5
+Set the changed flag of the current buffer.
+.IP dr 5
+Dualcase search mode
+affects rule one of regular expression construction
+so that a letter is matched without regard to its case.
+.IP er 5
+Error exit mode causes
+.I qed
+to exit if an error occurs (see the DIAGNOSTICS section).
+This option is mainly intended for use of qed in shell files.
+.IP ir 5
+Interrupt catching mode causes
+.I qed
+to exit when interrupted. (This includes removing the temporary file).
+.IP pr 5
+Prompting mode causes `*' to be typed
+immediately before a command (as opposed to text)
+is read from the terminal.
+.IP qr 5
+Quit catching mode causes
+.I qed
+to dump core, leaving the temporary file intact,
+when a QUIT signal is received.
+.IP Tr 5
+Tracing mode causes
+all commands not typed directly by the user to be echoed on the terminal.
+When a special character (other than `\eB or `\eN')
+is encountered, a `[' is typed,
+followed by a code specifying the character \(em
+`za' for register `a', `g' for global command list,
+`l' for `\el', `B' for browse pseudo-register, etc.
+Then, an `=' is typed, followed by the interpretation
+of the special character, followed by a `]'.
+.IP us 5
+Uppercase conversion mode enables case transformation in
+substitute commands.
+If the `u' flag is set, the character caret (`^') 
+becomes non-literal in the replacement text of a substitution.
+It behaves just like `&', but with case switching of alphabetics
+in the replaced text.
+If the flag is `u', all alphabetics are mapped to upper case;
+if `l', lower case; and if `s', the case is switched.
+.IP vs 5
+Verbose mode causes character counts to be typed
+after
+\fIe\fP,
+\fIr\fP,
+\fIw\fP,
+\fIR\fP,
+\fIS\fP,
+and
+.I W
+commands.
+It also causes `!' to be typed upon completion of the \fI!\fR,
+\fI<\fR, \fI|\fR  and \fI>\fR commands.
+.IP ?\fIc\fP 5
+\fIc\fP must be one of
+`c', `d', `i', `p', `T' or `v'.
+The value of the corresponding flag is stored in the truth.
+.PD
+.RE
+.TP 5
+( \fB. \fR, \fB. \fR)\|p
+The print command prints the addressed lines.
+`\fB.\fR' is left at the last line printed.
+.TP 5
+( \fB. \fR, \fB. \fR)\|P
+The PRINT command is similar to the print command,
+but each line displayed is preceded by its line number,
+any marks it has (which appear as `\*q\fIx\fR'),
+and a tab.
+.TP 5
+q
+The quit command causes
+.I qed
+to exit.
+No automatic write
+of a file is done.
+If the changed flag is set
+in any buffer,
+.I qed
+prints `?q'
+and refuses to quit.
+A second
+.I q
+or a
+.I Q
+will get out regardless,
+as will an end-of-file
+on the standard input.
+.TP 5
+Q
+Like
+.IR q ,
+but changed flags
+are not checked.
+.TP 5
+( $ )\|r filename
+The read command
+reads in the given file after the addressed line.
+If no \fIfilename\fP is given,
+the remembered \fIfilename\fP is used
+(see
+.I e
+and
+.I f
+commands).
+The \fIfilename\fP is remembered if there was not already a
+remembered \fIfilename\fP in the current buffer.
+Address `0' is legal for
+.I r
+and causes the
+file to be read at the beginning of the buffer.
+If
+.I qed
+is in
+.I verbose
+mode and the read is successful, the number of characters
+read is typed,
+except while
+.I qed
+is starting up,
+in which case an
+.I f
+command is performed.
+`\fB.\fR' is left at the last line read in from the file.
+.TP 5
+R filename
+The restore command restores an environment saved by a save (\fIS\fR) command.
+The changed flag in each buffer is restored from the files; all other flags
+are unaffected.
+The input stack is reset to the top (teletype input) level,
+and the current buffer becomes `a'.
+`\fB.\fP' is left at the saved value of `\fB.\fP' in buffer `a'\fB.\fP
+If the \fIfilename\fP is not specified, `q' is used.
+.TP 5
+( \fB. \fR, \fB. \fR)\|s\fIn\fR/regular expression/replacement/
+.PD 0
+.TP 5
+( \fB. \fR, \fB. \fR)\|s\fIn\fR/regular expression/replacement/g
+.PD
+The substitute command searches each addressed
+line for occurrences of the specified regular expression.
+The decimal number \fIn\fP defaults to 1 if missing.
+On each line in which
+.I n
+matches are found,
+the \fIn\fPth matched string is replaced with
+\fIreplacement\fP.
+If the global replacement indicator `g' follows the command,
+all subsequent matches on the line are also replaced.
+Within a line, a search starts from the character following the last match,
+unless the last match was an empty string,
+in which case the search starts at
+the second character following the empty string
+(to ensure a match is not repeated).
+It is an error for the substitution to fail on all addressed lines
+unless it is in a global command.
+`\fB.\fR' is left at the last line substituted.
+.PP
+.RS
+Any character other than newline or a numeral
+may be used instead of `/' to delimit the regular expression
+and \fIreplacement\fP.
+If the trailing delimiter is missing
+(i.e., an unescaped newline
+in the
+.IR replacement ),
+its presence is assumed,
+and the last line affected is printed,
+as if the
+substitute
+was followed by a
+.I p
+command.
+If delimiter following the expression
+is omitted as well,
+an empty
+.I replacement
+is assumed.
+.PP
+An ampersand `&' appearing in \fIreplacement\fP
+is replaced by the string matching the regular expression.
+As a more general feature,
+the characters
+`\\\fIn\fR',
+where
+.I n
+is a digit,
+are replaced by the text matched by the
+\fIn\fR-th
+regular subexpression
+enclosed between `\e\|(' and `\e\|)'.
+When nested parenthesized subexpressions are present,
+.I n
+is determined by counting occurrences of `\e\|(' starting from the left.
+.PP
+A caret `^' appearing in \fIreplacement\fP
+behaves much like an ampersand,
+but provides a mechanism for case switching of alphabetics,
+as discussed under the \fIo\fR command.
+To include an ampersand `&', caret `^', backslash `\\', newline,
+or the delimiter literally in
+\fIreplacement\fP,
+the character must be preceded by a backslash.
+Lines may be split by substituting newline characters into them.
+.RE
+.TP 5
+S filename
+The save command saves the full buffer and register information in two
+files called `filename:aq' and `filename:bq'.
+If the filename is absent, `q' is used.
+If the filename has more than 12 characters after the last slash `/',
+it is truncated to 12 characters to avoid overwriting the file.
+.TP 5
+( \fB.\fR , \fB.\fR )\|t\fIa\fR
+The copy command acts just like the move
+.I m
+command except that a copy of the addressed lines is placed after address
+\fIa\fP.
+`\fB.\fR' is left on the last line of the copy.
+The buffer to which the text was copied becomes the current buffer.
+.TP 5
+u
+The undo command restores the last line changed by a
+\fIs\fP,
+\fIu\fP,
+or
+.I x
+command.
+Any new lines created by splitting the original are left.
+It is an error if the line is not in the current buffer.
+`\fB.\fP' is left at the restored line.
+.TP 5
+( 1 , $ )\|v/regular expression/command list
+This command is the same as the global command
+except that the command list is executed
+with `\fB.\fR' initially set to every line
+.I except
+those
+matching the regular expression.
+.TP 5
+V/regular expression/command list
+This command is the same as the globuf command
+except that the command list is executed
+with the current buffer initially set to every active buffer
+.I except
+those
+matching the regular expression.
+.TP 5
+( 1 , $ )\|w filename
+The write command writes the addressed lines onto
+the given file.
+If the file does not exist,
+it is created.
+The filename is remembered if there was not already a
+remembered file name in the current buffer.
+If no file name is given,
+the remembered file name is used.
+`\fB.\fR' is unchanged.
+If
+.I qed
+is in
+.I verbose
+mode and
+the command is successful, the number of characters written is
+typed.
+.TP 5
+( 1 , $ )\|W
+The \fIW\fP command is the same as the \fIw\fP command except that
+the addressed lines are appended to the file.
+.PP
+.TP 5
+( \fB. \fR, \fB. \fR)\|x
+.RS
+The xform command allows one line at a time to be modified according to
+graphical requests.
+The line to be modified is typed out,
+and then the modify request is read from the terminal
+(even if the xform command is in a global command or other
+nested input source).
+Generally each character in the request specifies how to
+modify the character immediately above it, in the original line,
+as described in the following table.
+.IP # 5
+Delete the above character.
+.PD 0
+.IP % 5
+Replace the above character with a space.
+.IP ^ 5
+Insert the rest of the request line before the above character.
+If the rest of the request line is empty, insert a newline character.
+.IP $ 5
+Delete the characters in the above line from this position on;
+replace them with the rest of the request line.
+.IP "space or tab:" 5
+Leave above character(s) unchanged.
+.IP "any other:" 5
+This character replaces the one above it.
+.PD
+.PP
+If the request line is longer than the line to be modified,
+the overhang is added to the end of the line
+without interpretation,
+that is, without treating `#', `%', `^' or `$' specially.
+Any characters after a `^' or `$' request are not interpreted either.
+.PP
+Xform will not process control characters other
+than tab and newline,
+except in contexts where it need not know their width
+(that is, after a `^' or `$' request, or in the part of
+either the request or the line that overhangs the other).
+Remember that the ERASE character (processed by the system)
+erases the last character typed,
+not the last column.
+.PP
+Some characters take more than one column of the terminal
+to enter or display.
+For example, entering the ERASE or KILL characters literally
+takes two columns because they must be escaped.
+To delete a multi-column character,
+one must type `#' under all its columns.
+To replace a multicolumn character,
+the replacement must be typed under the first column of the character.
+Similarly, if a replacement character is multi-columned,
+it replaces the character in its first column.
+.PP
+The tab character prints as a sequence of spaces, and may be
+modified as if it were that sequence.
+As long as the last space is unmodified, it and the
+remaining contiguous spaces will represent a tab.
+.PP
+The modification process is repeated until the request is empty.
+Only a newline may immediately follow the `x'.
+.RE
+.TP 5
+y<condition><type>
+The jump command controls execution nested input sources.
+The condition is compared to the truth flag to see if the jump
+should be performed;
+if a `t', the jump is performed if the truth flag is true,
+if an `f', the jump is performed if the truth flag is false,
+if absent the jump is always performed.
+Several types of jumps exist:
+.RS
+.IP y[tf]o
+Jump out of the current input source.
+If the current input source is the command line
+for a \fIg\fR, \fIG\fP, \fIv\fR, \fIV\fR or \fIh\fR command, the command is terminated.
+.PD 0
+.IP y[tf]\fIN\fR
+Control is transferred to absolute line \fIN\fR (an integer)
+in the executing buffer.
+The current input source must be a buffer.
+.IP y[tf]\(aa<label>
+Control is transferred to the first line found,
+searching forward in the buffer,
+that begins with a comment "<label>.
+The match of the labels must be exact;
+regular expressions are not used to define the control label.
+(A tab, blank or newline after the double quote specifies a null label:
+a line beginning `"\ \ LAB' cannot be transferred to by this form of jump.)\ 
+If no such label is found,
+control resumes at the character after the label in the jump command.
+The current input source must be a buffer.
+.IP y[tf]\(ga<label>
+Similar to `y\(aa<label>',
+but the search is in the opposite (reverse) direction.
+.IP y[tf]
+If no
+recognized type is given,
+input is skipped up to the next newline.
+.PD
+.RE
+.IP
+It is an error if reading the label or line number for a jump command
+causes the current input source (i.e. buffer) to be `popped.'\ 
+This can happen if the label is the last word in the buffer,
+but can be circumvented by putting an extra blank or newline after
+the jump command.
+.TP 5
+( \fB.\fR , \fB.\fR )\|z\fIXc\fR
+\fIQed\fP has 56 registers labeled by bnames.
+Three of these,
+registers `T', `C', and `U',
+are reserved:
+`T' is the truth flag, `C' is the count,
+`U' contains the
+.SM UNIX
+command from the most recent
+bang, crunch, zap, or pipe command.
+The contents of register \fIX\fP,
+where \fIX\fR is a bname,
+can be inserted into the input
+stream with the special character ``\ez\fIX\fP''.
+The command ``z\fIX\fR''
+specifies register \fIX\fR
+as the argument to
+the operation character (signified above by \fIc\fR) that follows it.
+In the description below,
+\fIN\fR stands for a possibly signed decimal integer
+and \fIS\fR stands for a newline-terminated string.
+Newlines may be embedded in registers by escaping
+them with a backslash.
+Although some of the register commands refer to addressed lines,
+`\fB.\fP' is unaffected by a
+.I z
+command.
+The operations are as follows:
+.RS
+.IP p
+Print the contents of the register in `p' format.
+.PD 0
+.IP l
+Print the contents of the register in `l' format.
+.IP \fB.\fP
+Set the register to the contents of the addressed line.
+.IP /reg-exp/
+Set the register to the portion of
+current line that matches the regular expression in slashes.
+If no such pattern is found,
+the register is cleared.
+The truth flag is set according to whether a
+match was found.
+.IP \fB:\fR\fIS\fR
+Set register to the string following the colon.
+.IP \&\(aa\fIY\fR
+Make a direct copy of register \fIY\fR in register \fIX\fR,
+without interpreting special characters.
+\fIY\fR is any register bname.
+.IP +\fIN\fR
+Increment by \fIN\fR the ASCII value of each character in the register.
+Similarly, a `\-' decrements each character.
+.IP =\fIS\fR
+(Or `<' or `>' or `!=' or `!<' or `!>'.)\ 
+Set truth flag to the result of the lexical comparison
+of the register and the string \fIS\fR.
+.IP n
+Set the count to the length of the register.
+.IP )\|\fIN\fR
+(Or '('.)\ 
+`Take'
+the first \fIN\fR characters of the register, i.e. truncate at the \fIN\fR+1'th
+character.
+`(' (`drop') is the complementary operator;
+it deletes the first \fIN\fP characters from the register.
+If \fIN\fP is negative, the break point is |\|\fIN\fP| from the end.
+.IP [/reg-exp/
+Set the count to the starting index of the regular expression in
+the register.
+Set the truth to whether the expression matches any of the register.
+.IP s\fIn\fP/reg-exp/replacement/
+.IP s\fIn\fP/reg-exp/replacement/g
+Perform a substitute command with semantics identical to the \fIs\fR command,
+but in the text of the register, not a line of the buffer.
+.IP C
+`Clean' the register: collapse each occurrence of `white space' in the register
+to a single blank, and delete initial and trailing white space.
+.IP {\|\fIS\fR
+Set the register to the value of the shell environment variable \fIS\fR,
+whose name may be terminated by a space, tab, newline or `}'.
+.PD
+.PP
+The registers can also be manipulated as decimal numbers.
+Numerical operations are indicated by a number sign `#'
+after the register name:
+e.g. `zx#+2'.
+It is an error to attempt to perform arithmetic on a
+register containing non-numeric text other than a leading minus sign.
+The numerical operations are:
+.IP a
+Set the value of the register to be the value of
+the address given to the command; e.g. `$za#a' sets register `a'
+to the number of lines in the buffer.
+.PD 0
+.IP r
+Set register \fIX\fR to be the first address
+given the command,
+and \fIX\fR+1 to be the second.  If \fIX\fR is `~', an error is generated.
+For example, `5,$zi#r' sets register `i' to 5, and
+register `j' to the value of `$'.
+`\fB.\fP' is unchanged.
+This command is usually used to pass addresses to a command buffer.
+.IP n
+Set register to the length of the addressed line.
+.IP \fB:\fIN\fR
+Set register to \fIN\fR.
+Scanning of the number stops at the first non-numeric character,
+not at the end of the line.
+.IP +\fIN\fR
+Increment register by \fIN\fR. `\-', `*', `/', and `%'
+decrement, multiply, divide, or modulo the register by \fIN\fR.
+.IP P
+Set register to the decimal value of the process id of
+.I qed.
+.IP =\fIN\fR
+(Or `<' or `>' or `!=' or `!<' or `!>'.)\ 
+Set truth flag to the result of the numeric comparison of the register
+and the number
+.I N.
+.PD
+.PP
+Several numerical operations may be combined in one command
+(and it is more efficient to do so when possible.)
+For example, `$zd#a\-3' sets register `d' to three less than the value
+of `$'.
+.RE
+.TP 5
+Z
+The zero command clears the current buffer.
+The contents, filename and all flags for the buffer are zeroed.
+The character after the `Z' must be a blank, tab or newline.
+.TP 5
+( $ )\|=
+The line number of the addressed line is typed.
+`\fB.\fR' is unchanged.
+.TP 5
+!\|<\s-2UNIX\s+2 command>
+The bang command sends the
+command line after the `!'
+to the UNIX shell to be interpreted as a command.
+Embedded newlines must be preceded by a backslash.
+The signals INTR, QUIT, and HUP are enabled or disabled
+as on entry to
+\fIqed\fP.
+At the completion of the command,
+if
+.I qed
+is in
+.I verbose
+mode, an `!' is typed.
+The return status of the command is stored in the truth flag.
+`\fB.\fR' is unchanged.
+.IP
+The
+command line
+is stored in register `U'.
+If a second `!' immediately follows the first,
+it is replaced with the uninterpreted contents
+of this register.
+Thus `!!' repeats the most recent bang command,
+and `!! \(or wc'
+repeats the command with an additional pipeline element added.
+.TP 5
+( 1 , $ )\|>\|<\s-2UNIX\s+2 command>
+The zap command is similar
+to the bang command,
+but the addressed lines become the default standard input of the command.
+The command is stored in register `U',
+as for bang;
+`>>' corresponds to `!!'.
+.TP 5
+( $ )\|<\|<\s-2UNIX\s+2 command>
+The crunch command is similar to the bang command,
+but the standard output of the command is appended to the current buffer
+after the addressed line, as though read with an \fIr\fR command
+from a temporary file.
+The command is stored in register `U'
+as for bang;
+`<<' corresponds to `!!'.
+`\fB.\fP' is left at the last line read.
+.TP 5
+( 1 , $ )\||\|<\s-2UNIX\s+2 command>
+The pipe command is similar to the bang command,
+but the addressed lines become the default standard input of the command,
+and are replaced by the standard output of the command.
+The command is stored in register `U'
+as for bang;
+`|\||' corresponds to `!!'.
+If the command returns non-zero status, the original lines are not deleted.
+`\fB.\fP' is left at the last line read.
+.TP 5
+( \fB.\fR )"
+The comment command sets dot to the addressed line, and ignores
+the rest of the line up to the first following double quote or newline.
+If, however, the character immediately after the double quote is
+a second double quote (i.e. the command is ``""''),
+the text which would normally be ignored is typed on the standard output.
+Special characters in the text will be interpreted, whether or not
+the text is printed,
+so to print a message such as ``Type \\bx'' requires the command
+``"\|"\|Type \\cbx''.
+Commented lines are used as labels by the
+.I y
+(jump) command.
+.TP 5
+%
+The register print command displays the name and value of all defined
+registers,
+followed by the \\p (`P') and \\r (`R') pseudo-registers,
+and the browse (`B') pseudo-register, if defined.
+.TP 5
+#
+The numeric register print command displays the name and value of all
+defined registers with numeric values.
+.TP 5
+( \fB.\fR+1 , \fB.\fR+1 )<newline>
+An address or addresses alone on a line
+cause the addressed lines to be printed.
+If the last address separator before the newline was `;',
+only the final addressed line is printed.
+A blank line alone causes the contents of the
+browse pseudo-register (described with the
+.I o
+command) to be executed.
+If the register is null, as it is initially,
+the newline command behaves as though the register contains
+`\fB.\fP+1p'.
+.PP
+.ul
+Special Characters
+.PP
+\fIQed\fP has some special character sequences with non-literal
+interpretations.
+These sequences are processed at the
+.I lowest
+level of input, so their interpretation is completely transparent
+to the actual commands.
+Whenever input from the user is expected, a special character can appear and
+will be processed.
+Special characters can be nested in the sense that, for example,
+a buffer invoked by `\eb' can contain a register invocation `\e\|z'.
+Backslashed escape sequences such as `\e\|(' in regular expressions
+are
+.I not
+special characters, so are not interpreted at input.
+The sequence `\e\|(' is left untouched by the input mechanism of
+.I qed;
+any special meaning it receives is given it during regular expression
+processing.
+The special characters are:
+.RS
+.IP \eb<bname>
+The `b' must be followed by a bname.
+When `\eb\fIX\fR' is typed,
+the contents of buffer \fIX\fR, up to but \fInot including\fP the last
+newline, are read as if they were entered from the keyboard.
+Typically, the missing newline is replaced by the newline which
+appears after the buffer invocation.
+Changing the contents of an executing buffer may have bizarre effects.
+.PD 0
+.IP \e\|B
+Equivalent to current buffer's bname.
+.IP \ec
+The sequence \ec is replaced by a single backslash,
+which is not re-scanned.
+The effect of the `c' is to delay interpretation of a special
+character.
+.IP \e\|f
+Equivalent to current buffer's file name.
+.IP \e\|F<bname>
+Equivalent to the file name in the named buffer.
+.IP \e\|l
+One line is read from the standard input up to, but \fInot including\fP
+the terminal newline, which is discarded.
+Note that the first invocation will read the remainder of the last
+line entered from the keyboard.
+For example, if a buffer is invoked by typing the line:
+.br
+.ti +5
+\ebxjunk
+.br
+the first \e\|l in buffer `x' will return the string `junk'.
+.IP \e\|N
+Equivalent to a newline.
+Primarily useful when delayed.
+.IP \ep
+Equivalent to the most recent regular expression used.
+.IP \e\|r
+Equivalent to the replacement text of
+the most recent substitute or join command.
+.IP \e\|z<bname>
+Equivalent to the contents of register `\e\|z\fIX\fR'.
+If the register changes during execution, the changes appear immediately
+and affect execution.
+If a `+' (`\-') appears between the `z' and the bname,
+the ASCII values of the characters in the register are
+incremented (decremented) by one before interpretation.
+If a `#' precedes the `+' (`\-')
+the contents of the register are numerically incremented (decremented).
+.IP \e"
+The sequence \e" means `no character at all'!
+It is primarily used to delay interpretation of a period
+that terminates an append, until the second or third time
+it is read (e.g. in loading execution buffers):
+the sequence \ec"\fB.\fP at the beginning of a line
+puts a period on the line which will terminate
+an append the second time it is read.
+.IP \e\*q[bfFlprz]\ 
+If an apostrophe
+appears between the backslash and the identifying character
+for one of the special characters `\eb', `\e\|f', `\e\|F', `\e\|l', `\e\|p',
+`\e\|r' or `\e\|z', interpretation is as usual except that
+any further special characters \fIembedded\fP
+in the buffer, register, etc. are \fInot\fP interpreted.
+Actually, any special character may be quoted, but in forms such as
+`\e\*q\|B', the quote has no effect.
+.RE
+.PD
+.PP
+A special character is interpreted immediately when it appears
+in the input stream,
+whether it is currently coming from
+the teletype, a buffer, a register, etc.
+(This includes characters read when typing a special character:
+`\e\*qb\eza', with register `a' containing the character `X',
+invokes the literal contents of buffer `X'.)\ 
+Thus, interpretation is recursive unless the special character
+is `\ec'.
+Special characters appearing in text processed in a command such
+as move, read or write, are \fInot\fP interpreted.
+If the backslash-character pair is not a special character
+from the above list, it is passed unchanged.
+Interpretation may be delayed using `\ec'; for example,
+if a `\ebx' is to be appended to a buffer for later interpretation,
+the user must type `\ecbx'.
+To delay interpretation \fIn\fP times, \fIn\fP c's must be placed between the
+backslash and the identifying character.
+In regular expressions and substitutes,
+a backslash preceding a metacharacter turns off its special meaning.
+Even in these cases,
+a backslash preceding an ordinary character is not deleted,
+unlike in \fIed\fP.
+For example, since the `g' command must read its entire line,
+a `\e\|zx' in a substitute driven by a global must be delayed
+if the contents of the register are to be different for each line,
+but since `\e&' is not a special character except to the substitute,
+its interpretation need not be delayed:
+.sp
+.in +5
+zA#:1
+.br
+g/\|\e$/ s\|/\|\e.xyz\|/\|\eczA \e&/p  zA#+1
+.sp
+.in
+globally searches for lines with a literal currency sign,
+and on each one substitutes for `.xyz' the contents
+of register `A'
+at the time of substitution,
+followed by a space and a literal ampersand,
+prints the result and increments register `A'.
+As a second example, the substitute
+.ti +5
+.sp
+s\|/xyz\|/\|\e\e\|N&/
+.sp
+replaces `xyz' with a newline followed by `xyz'.
+Note that the `\e\e\|N' is interpreted as
+`backslash followed by newline,'
+as the sequence `\\\\'
+.ft I
+has no special meaning in qed
+.ft R
+outside of regular expressions
+and replacement text.
+However,
+to match, say, `\e\e\|z' using a regular expression, it must be entered
+as `\e\e\ecz'.
+.PP
+.PP
+If an interrupt signal (ASCII DEL) is sent,
+.I qed
+prints `??' and returns to its command level.
+If a hangup signal is received,
+.I qed
+executes the command `S qed.hup'.
+.PP
+Some size limitations:
+512 characters per line,
+256 characters per global command list,
+1024 characters of string storage area,
+used for storing registers, file names and regular expressions,
+16 levels of input nesting,
+and 128K characters in the temporary file.
+The limit on the number of lines depends on the amount of core:
+each line takes 1 word.
+.SH FILES
+/tmp/q#, temporary;
+`#' is the process number (six decimal digits).
+.SH DIAGNOSTICS
+Diagnostics are in the form of `?' followed by a single letter code.
+If the diagnostic is because of an inaccessible file,
+the offending file name is also displayed.
+If input is not from the highest level (i.e. the standard input,
+usually the terminal), a traceback is printed, starting with the
+lowest level.
+The elements of the traceback
+are of the form ?b\fIXM.N\fR or ?z\fIXN\fR,
+where \fIX\fR is the buffer or register being executed when the
+error was encountered,
+\fIM\fR is the line number in the buffer and \fIN\fR is the character
+number in the line or register.
+The possible errors are:
+.PD 0
+.IP 0
+non-zero status return in \fI|\fR command
+.IP F
+bad bname for \e\|F
+.IP G
+nested globuf commands
+.IP N
+last line of input did not end with newline
+.IP O
+unknown option in the \fIo?c\fP command
+.IP R
+restore (\fIR\fR) command failed
+(file not found or bad format)
+.IP T
+I/O error or overflow in tempfile
+.IP Z
+out of string space; clear a few registers or file names
+.IP a
+address syntax
+.IP b
+bad bname in a \fIb\fR command or for \\b
+.IP c
+ran out of core
+.IP f
+filename syntax error
+.IP g
+nested global commands
+.IP i
+more than 52 files in initialization argument list
+.IP k
+bad bname in \fIk\fR command
+.IP l
+an internal table length was exceeded
+.IP m
+tried to move to an illegal place (e.g. 1,6m4)
+.IP o
+error opening or creating a file
+.IP p
+bad regular expression (pattern) syntax
+.IP q
+.I e
+with the current changed flag set,
+or
+.I q
+with any changed flag set
+.IP r
+read error from file
+.IP s
+no substitutions found
+.IP t
+bad \fIx\fR command data or single-case terminal
+.IP u
+no line for \fIu\fR command to undo
+.IP x
+command syntax error
+.IP w
+write error on file
+.IP y
+bad jump command (including popping the input buffer while scanning the label)
+.IP z
+bad register bname
+.IP |
+failure to create pipe for \fI<\fR, \fI|\fR or \fI>\fR command
+.IP #
+bad numeric register operation
+.IP $
+line address out of range
+.IP ?
+interrupt
+.IP /
+line search failed
+.IP [
+bad index in a register take or drop command
+.IP \e
+attempt to recursively append a buffer
+.IP !
+jackpot \(em you found a bug in regular expression matching
+.PD
+.PP
+.SH "SEE ALSO"
+qedbufs(1)
+.br
+A Tutorial Introduction to the ED Text Editor
+(B. W. Kernighan)
+.br
+Programming in
+.IR Qed :
+a Tutorial
+(Robert Pike)
+.br
+ed(1)
+.SH "U of T INFO"
+Written at U of T,
+based on several incarnations of
+.I ed,
+with contributions from
+Tom Duff, Robert Pike, Hugh Redelmeier and David Tilbrook.
+.SH BUGS
+The changed flag is not omniscient; changing the contents of
+the file outside of
+.I qed
+will fool it.
+.br
+Xform \fIcould\fP work on single-case terminals, but backslashes
+become very confusing for the user.
+.br
+On the PDP-11, numeric registers are 16-bit integers, but the
+count is a 32-bit integer.

@@ -1,0 +1,19 @@
+Text sizes of qed, on vax and 68K.
+%'s are (68k/vax)-1
+
+vax	68k	%	routine
+520	658	26%	address.o
+396	554	39%	blkio.o
+4508	6076	34%	com.o
+2020	2788	38%	getchar.o
+1732	2040	17%	getfile.o
+824	1002	21%	glob.o
+4776	5674	18%	main.o
+1180	1622	37%	misc.o
+876	1340	52%	move.o
+2420	3354	38%	pattern.o
+780	1106	41%	putchar.o
+184	286	55%	setaddr.o
+556	1058	90%	string.o
+2532	3498	38%	subs.o
+23304	31056	33%	total

@@ -1,0 +1,12 @@
+" Run a qed buffer `off line'
+z{:\l
+z{C
+z{s/$/ /
+z|'{ z{[/ /
+z{)\zC z|(\zC z|C
+" z{: command   z|: argument string   z}: return buffer set by zr
+b{ E \zq\z{.q
+ovs
+b\z} \b{
+" Note! ok to ZERO buffer ~ (this buffer); the line will finish executing
+b{Z b~Z

@@ -1,0 +1,99 @@
+% cat mail@
+mail
+From hugh Wed Nov 19 21:26:46 1980
+The description of Quantification and Alternation in regular expressions
+might read:
+
+6.  A regular expression of the form <x1> or <x1|x2|...|xn>, where the
+x's are regular expressions of forms 1-12, matches what the
+leftmost successful x matches.  The nesting of \( and \) (see rule 11)
+must be identical in each x.
+
+Rule 8 must be augmented:
+
+The regular expression must not contain \( or \) (see rule 11).
+
+In place of this addition to rule 8 and the last sentence of the
+proposed rule 6, you could add to rule 11:
+
+The nesting of these brackets in each regular expression of an alternation
+(rule 6) must be identical.  An alternation with these brackets may
+not be iterated (rule 8).
+
+This formulation requires fewer forward references, and talks about
+\( and \) only one place.  It seems somewhat awkward in that it
+gives names to the constructs of rules 6 and 8.
+
+I recommend you listen to Talking Heads' latest, "Remain in the Light".
+I at first found it interesting and then later I grew to like it.
+
+From hugh Thu Nov 13 21:16:17 1980
+1. If you have the time and patience at 300 baud, type:
+   "cd /u2/hugh/bin
+    huf -p mr.nrH | nroff pre.nr -"
+   It is an 8 page document partially addressing the problem
+   I think you raised with allocreg.  You might save yourself
+   some time if you made a copy of pre.nr and changed the ".po".
+2. Do you know why the modify date on my qed is so recent?
+   Is my copy older than the system's now?  If so, I will delete it.
+   (It must be different because the lengths are different (but only a
+   little).)
+
+Save?n
+% mail hugh
+remiaain in light i know very well... i saw TH at radio cyity a while ago.
+fantastic.
+also check out@
+if yuou're up for a laugh, look for "mkistakes" by gruppo sporitiv.o.
+.
+% cu
+remote:
+rob
+Password: 
+CSRG 11/45 UNIX.
+Charging grafix.
+You have mail.
+% ed .mail
+361
+1
+From dave Fri Nov 14 10:14:56 1980
+
+Groan. I didn't recompile it, just installed from the tape bin/qed.v6.
+
+Now I have to recompile etc.
+
+
+
+From alain Tue Nov  4 11:26:59 1980
+
+Graphics meeting announcement (belated):
+/From/
+From dave Fri Nov 14 10:14:56 1980
+q
+% echo > .mail
+% 
+login: 
+Login incorrect.
+Name: rob
+Password: 
+CSRG 11/45 UNIX.
+Charging grafix.
+% who
+rob     ttyr Nov 25 00:40
+% 
+login: 
+
+Logi
+n incorrect.
+Name: Login incorrect.
+Name: ~.Login incorrect.
+local:
+
+% 
+% 
+% 
+% who
+rob     ttyh Nov 25 00:37
+akram   ttyi Nov 24 19:11
+spinney ttyj Nov 24 23:07
+spinney ttyo Nov 25 00:17

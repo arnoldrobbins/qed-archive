@@ -1,0 +1,29 @@
+bx
+Z
+<nm -ng \'Fa
+yf'OK		" f==0; ok status
+	""Sizes: nm error
+	y'Quit
+"OK
+zS:Start
+zL:0
+1"
+"Loop
+	$zA#a#=0 yt'Done
+	s/ [TDB]//
+	zN/ .*/
+	zN(1	" drop blank
+	s/ .*//
+	zA.
+	zB#:0 zP#:1
+	ht zX#:\czA#%10#*\czP zP#*8 zB#+\czX zA#/10#=0
+	zX#:\zB#-\zL
+	""\zX	\zS
+	zS'N zL'B
+	d
+	y`Loop
+"Done
+"Quit
+q
+
+

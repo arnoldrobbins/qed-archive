@@ -1,0 +1,41 @@
+CIT:
+- many bugs fixed; e.g. startup code doesn't work if nfiles>25
+- added \5 in RE's (making them IRREGULAR!) -- see V7 ed docn
+BELL:
+- l mode changed so tab is \(tab), \n appears after space or tab
+  - this will change back; i don't like it (it's slightly ambiguous
+    if spaces follow tabs on a line)
+- cd command gone away
+- , now defaults to 1 on LHS, $ on RHS; * address operator gone away
+- /etc/qedfile concept gone; it is now a env. var QEDFILE
+- oB is old ob
+- ob67P sets page size to 67 lines in P format
+- changed b command so that b40 means page is 40 lines not 41
+- change (c) doesn't delete until after '.' is typed (so you can DEL)
+- added <...|...|...> to regular expressions
+	| chooses alternate RE's  <x|y> matches x or y
+	<> can be *'d or +'d
+- zae now gets one char code of last err; null string if none so far.
+- zap prints in p mode; zal in l mode; zan sets count to length of reg.
+- za#n sets count to length of .
+- za#? gone; za#P gets pid
+- ok command gone
+- ha gone. the rule for until now is:
+	h[N][tf ]
+	t==> until true; f==> until false; blank ==> forever
+	if number is present, it's like an OR
+- xform demands you have dualcase. if not, you get an error (t)
+- V6 support completely gone (sorry. well, not really)
+- W is now an appended write. cflag still gotten right!
+- can write empty file if address is explicit.
+- za{VAR} puts environment variable in za
+- | is the long-awaited in-code replacement for \zrun
+- zas/x/y/  substitutes y for x in za. real substitute!
+- -e flag: exit on error (for pipelining)
+- trailing delimiters in sub's etc. cause auto print
+- nflag taken away; x is automatically xp
+- ?q, Q and E like in ed
+- b.
+- on startup, gives 'f' line instead of char count
+- zU gets last command line typed to unix, !! >> << || replace second char by
+  \'zU

@@ -1,0 +1,66 @@
+" Help to create a manual section
+" Prompts which leave cursor on same line expect one line of input;
+"  others take text up to lone . on a line.
+za:\Fa
+za=
+yf'OK
+	"Usage
+	""Usage: manual file.n
+	q
+"OK
+	a \za
+	za/\.[0-9]+$/
+	za=
+	yt`Usage
+bA a
+"Getline
+	za:\cl
+	za=.
+	yt'done
+		a \cza
+	y`Getline
+"done
+.
+ba
+"Create the name from the file name
+	a \Fa
+	s/\.[0-9]+$//
+	za/\//
+	za=
+	yt s|.*/||
+	zn.
+	s/.*/^/
+	zN.
+	s/^/.th /
+""Section number (Roman): "
+	za:\l
+""Date: "
+	zb:\l
+	a \za \zb
+	j/ /
+	a .sh NAME
+""Brief description: "
+	a \zn \*- \l
+""Synopsis: \zn"
+	a .sh SYNOPSIS
+	a \cfI\zn\cfP\l
+""Description:
+	a .sh DESCRIPTION
+	\bA
+""See Also: "
+	a .sh "SEE ALSO"
+	a \l
+""Files: "
+	a .sh "FILES"
+	a \l
+""Diagnostics:
+	a .sh DIAGNOSTICS
+	\bA
+""Author: "
+	a .sh AUTHOR
+	a \l
+""Bugs:
+	a .sh BUGS
+	\bA
+w \Fa
+q

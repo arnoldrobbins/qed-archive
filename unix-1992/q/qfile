@@ -1,0 +1,17 @@
+""Qed
+zX{TERM}
+	zX=2621\N yf ob22 oB""A"+p
+zA:ob22 oB""[A"+p
+zb:G@	\cl@f\cN
+zc:s@$@	/* \cl */@ p
+zf:-/^[a-zA-Z_].*(/
+zg:o?c yf w\cN!com \cf
+zi:zX/[0-9]+/ s//\cz#+X/p
+zj:a \cl\cNjp
+zm:o?c yf w\cN zX:\cf\cN zXs/\..*$/\czS/ ""!make \czX\cN!make \czX
+zq:/usr/rob/qed/q/
+zr:zL#r z}:\cB\cN ovr b~E \czqRun\cN \cb~\cN b\cz}
+zs:s\cl@@\c'r@p
+zw:s\cl@[A-Za-z0-9]+@\c'l@p
+zx:s\cl@[A-Za-z0-9]+\_@@p
+b~Z

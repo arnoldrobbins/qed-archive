@@ -1,0 +1,41 @@
+From research!rob Tue Sep  1 21:51 EDT 1981
+Since you are using qed, perhaps I can make some suggestions.  These
+are the good features of fred not found in QED (there may be more):
+- to prevent garbage making sense as a fred command, Fraser tightened up the
+  syntax.  He forced delimiters after some commands.  Perhaps the least
+  painful change was to require regular expression delimiters and the
+  like to be special characters, not letters or digits or control characters.
+  I recomend this small change highly.
+- fred allows long buffernames: where a letter was allowed, (name) is now
+  acceptable (this is like nroff except the name is not forced to be
+  2 chars and the closing paren is required).  There is even an option to
+  require this form of name.  When programming, I follow this rule, but
+  I don not when just entering commands.
+- fred allows patterns to be saved & named.  These patterns are saved in their
+  compiled form, so context dependent meanings are fixed (good!).
+- when searching for lines that match a pattern (eg in addresses or in
+  the g command), ~/pattern/ matches any line that /pattern/ does not.
+  This makes the v command obsolete.  It also seems useful in addresses.
+  A substitute with this form makes no sense to me.
+- Although I do not like options (they create to many variants of the editor),
+  some of freds options are useful.  I like being able to specify which
+  regular expression operators need to be escaped to turn them on and which
+  do not.  I like being able to say how to print nasty things like control
+  characters.
+- fred has a rule that makes understanding code easier.  Anything that
+  is delimited must have its delimiters supplied from the same input stream.
+  for example, if I write s/\bx/\by/ slashes in the buffers do not
+  terminate the operands.  This applies to the delimiter for an append
+  command too.  I like this feature: anything it forbids can be done
+  another way & is pornographic done the forbidden way.
+- to print a message, jm (Jump Message) and jp (Jump Prompt - no nl).
+  The message is either terminated by the end of line or surrounded
+  by slashes.  This seems nice.
+- there is an escape that enables re operators, even if they were already
+  enabled.  There is another that dissables re operators, even if they were
+  already.  This is less error prone than the convention used in ed and qed.
+  It makes it possible to write option-insensative command buffers.
+  (This feature was added at my prompting: the only change I have managed
+  to accomplish.  Not only are backslashes exponential, they take up most
+  control characters to encode -- ugh!)
+
