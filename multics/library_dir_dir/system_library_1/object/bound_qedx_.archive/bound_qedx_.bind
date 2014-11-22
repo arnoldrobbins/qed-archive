@@ -1,0 +1,37 @@
+/* Bindfile for: bound_qedx_ -- the Multics qedx Editor */
+
+/* Created:  18 February 1971 by Dan Bricklin */
+/* Modified: 30 November 1971 by C. Garman */
+/* Modified: 4 August 1975 by M. A. Meer */
+/* Modified: 3 March 1982 by S. Herbst to add copyrl and qx_search_file_ */
+/* Modified: 3 November 1982 by S. Herbst to add search_file_$silent */
+/* Modified: 12 January 1982 by G. Palter to add qedx_ and delete copyrl */
+/* Modified: 11 March 1985 by Keith Loepere so it can go into hardcore. */
+
+Objectname:	bound_qedx_;
+   Global:	   delete;
+
+   Order:		   edx_util_,
+		   get_addr_,
+		   search_file_,
+		   qedx_,
+		   check_entryname_,
+		   qedx;
+
+/* Instructions for individual components */
+
+objectname:	check_entryname_;
+   retain:	   check_entryname_;
+
+objectname:	qedx;
+   synonym:	   qx;
+   retain:	   qedx, qx;
+
+objectname:	qedx_;
+   retain:	   qedx_;
+
+objectname:	search_file_;
+   synonym:	   qx_search_file_;
+   retain:	   search_file_, silent;
+
+/* end; */
