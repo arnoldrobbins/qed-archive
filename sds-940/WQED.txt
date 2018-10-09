@@ -1,0 +1,3407 @@
+WQED   IDENT
+*QED ASSEMBLY AND LOADING PROCEDURE:
+*      ASSEMBLE THE TEMPS (SQED) WITH NARP
+*      ASSEMBLE THE CODE (WQED) WITH NARP (NOT "CONTINUE NARP")
+*      LOAD THE TEMPS AT 210B WITH DDT
+*      LOAD THE CODE AT 30000B WITH DDT
+*      SYSTEM STARTING ADDRESS: 30000B (QED), CONTINUE: 30001B
+*      TO MAKE A SAVED FILE, SAVE CORE FROM 30000 TO 37777 WITH
+*        STARTING ADDRESS 30004B (QEF), (CONTINUE ADDRESS 30001B)
+
+
+BBN    EQU     -1              (BBN=-1,NEW BRSS)(BBN=1,OLD BRSS)
+
+* MACROS
+BNE    MACRO   A
+       SKE     A(1)
+       BRU     A(2)
+       ENDM
+BEQ    MACRO   A
+       SKE     A(1)
+       BRU     *+2
+       BRU     A(2)
+       ENDM
+ELSE   MACRO   A
+       BRU     *+2
+       A(1)
+       ENDM
+IFP    MACRO   A
+       SKN     A(1)
+       A(2)
+       ENDM
+MVP    MACRO   A
+       LDP     A(1)
+       STP     A(2)
+       ENDM
+DB     MACRO   A
+       SKR     A(1)
+       BRU     A(2)
+       ENDM
+BLE    MACRO   A
+       SKG     A(1)
+       BRU     A(2)
+       ENDM
+GC     MACRO   A
+       GCI     A(1)
+       BRU     A(2)
+       ENDM
+MVA    MACRO   A
+       LDA     A(1)
+       STA     A(2)
+       ENDM
+CWC    MACRO
+       MUL     =30000000B
+       LSH     2
+       SUB     =1
+       ENDM
+SPTR   MACRO   A
+A(1)3  DATA    3*A(1)-1
+       ENDM
+TYPE   MACRO   C
+       LDA     =C(1)
+       SBRM    TO
+       ENDM
+STZ    MACRO   A
+       CLA
+       STA     A(1)
+       ENDM
+CPYST   MACRO   S
+       LDA     =S(1)
+       LDB     =S(2)1
+       SBRM    CPY
+       ENDM
+TYS    MACRO   S
+       GCI     S(1)
+       BRU     S(2)
+       SBRM    TO
+       BRU     *-3
+       ENDM
+SLN    MACRO   S
+       GCI     S(1)
+       BRU     S(2)
+       SKE     =155B
+       BRU     *-3
+       ENDM
+BNCR   MACRO   A
+       SKE     =155B
+       BRU     A(1)
+       ENDM
+CCW    MACRO
+       MUL     =12525253B
+       ENDM
+BNI    MACRO   A
+       SKG     A(1)
+       SKG     A(2)
+       BRU     A(3)
+       ENDM
+GCF    MACRO   D
+       LDA     D(1).1
+       SKG     D(1)
+       BRU     D(2)
+       MIN     D(1)
+       MIN     CJ
+       LDA*    WA
+       EXU*    CJ
+       ETR     =377B
+       ENDM
+SKBS   MACRO   A
+       SBRM    BSK
+       ENDM
+FRJ    MACRO   A
+       EAX     A(1)
+       SBRM    WJ
+       ENDM
+RJS    MACRO   A
+       EAX     A(1)
+       BRM     RJ
+       ENDM
+GCVB   MACRO   A
+       BRM     GVV
+       BRU     *+2
+       BRU     A(1)
+       ENDM
+BRMSET MACRO   A
+       EAX     A(2)
+       STX     A(1)1
+       ENDM
+LOADB  MACRO   N
+       LDX     =N(1)*2
+       SBRM    LB
+       ENDM
+* ENTRY POINTS AND PANIC LOGIC
+QED    BRU     QEG
+       BRU     QEE
+       DATA    Z,ZE            (POINTERS TO Z-TABLE FOR ROGER)
+QEF    CLA
+       LDB     =1
+QEG    STP     AFN
+       MVA     BUF3,P1
+       STA     CRP
+       STA     P
+       STA     BMP1
+       LDA     =ABF
+       CWC
+       STA     ABF3
+       LDX     =1B5            (BRU)
+       BRMSET  NXW,NXWR
+       BRMSET  GVV,GVC
+       BRMSET  WOP,WOC
+       BRMSET  RJ,RJE
+       BRMSET  WW,WWW
+       MVP     LDNL,LDN
+II     MVA     =PPAN,201B
+       MVA     =MPN,202B
+       MVA     =ACT,AT
+       MVA     =ACT1,AT1
+       MVA     =ACT2,AT2
+       LDA     =Q
+       SUB     =QL
+       STA     QL
+       CAX
+       LDA     ABF3
+       STA     QL,2
+       BRX     *-1
+       MVA     =-1,BVF
+       STA     WF
+       STA     ROCN
+       STA     NIR
+       STA     CFRO
+       MVA     =1,CUR
+       STZ     GSTF
+       STA     WRF
+       STA     WRFLG
+       STA     RDFLG           (UNSET READ AND WRITE FLAGS)
+       STA     IBE
+       STA     GSPF
+IT     LDX     =-NTAB
+       STA     TSE,2
+       BRX     *-1
+       LDP     TSI
+       STP     TS
+       LDP     TSI+2
+       STP     TS2
+       CLA
+       SBRM    CRS
+QEE    MVA     =-1,FTY
+       XMA     SN
+       SKG     =-1
+       CLA
+       SBRM    FSS
+       SBRM    CRLF
+       LDA     =CG
+       BRU     EER
+*INTERRUPT LOGIC
+*REALIGN DOT
+RLGN   ZRO     RLGNZ
+       STZ     FSX
+       MVA     BUF3,CRP
+       LDA     =1
+       XMA     CUR
+       SBRM    FND
+       BRR     RLGNZ
+*PROGRAMMED PANIC
+PPOUT  MVA     =-1,NIR
+       XMA     ROCN
+       BLE     =0,EE
+       BRS     10
+PPAN   ZRO     PANX
+       STP PPP;  STX PPX       SAVE A,B,X FRO RETURN TO PROCEDURE
+       CLA
+       LDX     =-1
+       BRS     13
+       CXA
+       STA     IBE
+       MIN     ROCN
+       IFP     NIR,(BRU EEF)
+PPWRT  IFP WRFLG,(BRU PPRDT);  LDA =137B*2B5+137B*4B2+137B;  WIO WRF
+PPRDT  IFP RDFLG,(BRU PPAN1);  LDA =155B;  WCI P;  RJS P;  MIN LCT
+       SBRM STE
+PPAN1  BRS 17;  LDA =-1;  STA ROCN;  STZ WRF;  STA WRFLG;  STA RDFLG
+       BRS 43;  SKB =77B4;  BRU *+2;  BRU PPC;  LDA =RB;  BRS 4
+*(DELETE PAGE ACQUIRED TO BUFFER READ OR WRITE IF STILL IN MAP)
+PPC    LDA     GSPF
+       SKA     =100B
+       ELSE    (BRU PPGN)
+       IFP     CFRO,(ELSE (BRU PPHN))
+       MVA     =-1,CFRO
+       SKBS
+       ELSE    (BRU PPHN)
+       LDA     =147B
+       CIO     AFN1
+       BRU     EEF
+PPGN   IFP     CFRO,(ELSE (BRS 10))
+PPHN   MVA     =-1,CFRO
+       STA     IBE
+       STZ     GSPF
+       BRU     EE
+*MEMORY PANIC
+MPN    ZRO     PANX
+       STP PPP;  STX PPX       SAVE A,B,X FOR RETURN TO PROCEDURE
+       LDA     MXF
+       ETR     =37777B
+       STA     PANX
+       IFP     MXF,(BRU EE)
+GUM    LDA     =MPM
+       SBRM    MSG
+       IFP     MXF,(BRU EE)
+       BRU     EEF
+*RE-ARM INTERRUPTS
+EE     LDX     =-1
+       BRS     29
+       LDA     =CP
+EER    STA     PANX
+       SBRM    RLGN
+EEF    MVA     QQ1,QQ
+       MVA     =-40,QN
+       STA     COMIX
+       STA     COMIY
+       STZ     FTY
+       LDA     =3000000B
+       BRS     78
+       LDP PPP;  LDX PPX       RESTORE A,B,X FOR RETURN TO PROCEDURE
+       BRU*    PANX
+* COMMAND PROCESSOR
+CEF    CLA
+       XMA     WRF
+       BRS     20
+CE     TYPE    37B
+CP     SBRM    CRLF
+       LDX     =-1
+       BRS     14
+       BRS     11
+CG     MVA     QQ1,QQ
+       MVA     =-40,QN
+       BRU     CA
+CR     SBRM    CRLF
+CA     LDX     =-1
+       STZ     CPYA
+       BRS     12
+       LDA     =12B
+       SBRM    PO
+       MVA     =RAL,MXF
+       LDA     =-1
+CO     STA     I
+       CLAB
+CM     STP     A
+CL     STZ     W
+       STA     NSY
+       STA     WSY
+CV     CLB
+       STB     SGN
+CI     SBRM    GNM
+       SKA     =200B
+       CLA
+       XMA     COMIY
+       STA     COMIX
+       LDA     COMIY
+       LDB     =37777777B
+       LDX     =CTB-ECTB
+       SKM     ECTB+1,2
+       BRX     *-1
+       CXA
+       EXU     ECTB,2
+       STX     EVLX
+       ADD     =ECTB+2
+       IFP     EVLX,(BRU CIW)
+       IFP     BVF,(BRU CK)
+       SKBS
+       SBRM    MSG
+CK     SBRM    TI
+       BNE     =16B,CKE
+       SBRM    CRLF
+CIE    SBRM    EVL
+       BRU     0,2
+CKE    BNE     =37B,CE
+       BRU     CP
+CIW    IFP     BVF,(BRU CIQ)
+CIR    SKBS
+       SBRM    MSG
+       BRU     CIE
+CIQ    XXA
+       IFP     (-1,2),(BRU CIX)
+       XXA
+       BRU     CIR
+CIX    XXA
+       BRU     CIE
+* ','
+CMA    SBRM    EVL
+       LDB     =-1
+       BRU     CM
+* '.'
+DOT    LDA     CUR
+       STA     N
+       MVA     =-2,NSY
+* '+' AND ' '
+PLS    CLB
+PE     SBRM    EVL
+       BRU     CV+1
+* '-'
+MNS    LDB     =-1
+       BRU     PE
+*<DOUBLE QUOTE>
+DQ     MVA     =-1,FTY
+       CLA
+       SKBS
+       STA     FTY
+       SBRM    TI
+       BEQ     =144B,EQZ
+       SKN     FTY
+       ELSE    (SBRM TO)
+       BRU     DQ
+* <LINE FEED>
+NXL    LDA     =155B
+       SBRM    PO
+       LDA     CUR
+       ADD     =1
+       BRU     TTL
+*<UP ARROW>
+PVL    LDA     CUR
+       BLE     =1,CE
+       SBRM    CRLF
+       LDA     CUR
+       SUB     =1
+       BRU     TTL
+TCL    LDA     CUR
+TTL    CLB
+       STB     AI
+       BRU     PNU
+*'/'
+PNI    SBRM    CRLF
+       SBRM    EVL
+PNU    SBRM    IVL
+       MVA     CUR,PLX
+       MVA     =-1,ATSZ
+       LDA     =37777777B
+       BRU     PNT
+PNQ    LDA     =QRM
+       BRU     PNH
+*P(RINT)
+PNP    SKN AI;  BRU *+2;  BRU PNG;  SKA =-1;  BRU PNG;  MVA =1,A
+       CNA;  STA AI;  SBRM LLF
+*(IF NO LINE-ADDRESSES PRECDED PRINT,PRINT THE WHOLE BUFFER)
+PNG    SBRM IVL
+       MVA     CUR,PLX
+       MVA     =-1,ATSZ
+       STA     PCX
+       LDA     =QDM
+PNH    SBRM    MSG
+       SBRM    GR
+       BRU     PNQ
+       BRU     PNE
+       STA     ATSZ
+       BRU     PNE
+PNJ    LDA     =53
+PNT    STA     PCX
+       MVA     =-1,FTY
+PNC    GCVB    PNR
+       BEQ     =200B,PNC
+       BEQ     =154B,PNL
+PNO    SBRM    TO
+       BEQ     =152B,PNF
+       BNCR    PNC
+       LDA     PLX
+       ADD     =1
+       XMA     PLX
+       SBRM    FND
+PNF    LDA     =-1
+       IFP     ATSZ,(ADM PCX)
+       SKR     PCX
+       ELSE    (BRU PNE)
+       LDA     =152B
+       IFP     ATSZ,(SBRM TO)
+       BRU     PNC
+PNL    LDB     PCX
+       SKB     =2B7
+       BRU     PNO
+PNE    SBRM    PEJ
+       BRU     PNJ
+PNR    LDB PCX;  SKB =2B7;  BRU PNS;  SBRM PEJ;  LDA =152B
+       SBRM TO;  SBRM TO;  SBRM TO
+PNS    STZ FTY;  BRU CA
+* R(EAD FROM )
+RD     SKE     =0
+       SBRM    CHH
+       STA     ILX
+       SBRM    GIF
+       MVA     =37777777B,RSX
+       STA     RCX
+       MVA     =RDIB,RDI
+       MVA     =RB,RWX
+       MVA     =RDD,RMX
+       MVA     =-1,RBX
+       AXC
+       STA     W
+       SKE     WRF
+       BRU     RDU
+       STA     RWX
+       LDA     =2
+       BRS     12
+       MVA     =144B,RTX
+       MVA     =RDIC,RDI
+       BRU     RDV
+RDU    MVA     =137B,RTX
+RDV    LDA     ILX
+       SKG     =0
+       BRU     RI2
+       SBRM    FND
+       LDA     P1
+       SKG     CRP1
+       BRU     RI4
+       LDA     CRP1
+       SBRM    SPB
+RI1    LDA     SN
+RI3    SUB     =2
+       SBRM    FSS
+RI4    LDX     SN
+       STX     RDX1
+       LDA     Z,2
+       ETR     =777777B
+       BLE     =M,RCL
+       BRU     RCR
+RI2    LDA     ZE
+       BRU     RI3
+RIB    LDX     =RB
+       STX     RWX
+       LDA     =3777B
+       BIO     WRF
+       NOP
+       SUB     =RB
+       ADD     =40000000B
+       STA     RSX
+       BRU     RDG
+RDIC   CIO     WRF
+       BRU*    RMX
+RDIB   BRX     RDIN
+RDG    DB      RSX,REC
+       LDA*    RWX
+       LRSH    16
+       STB     RUX
+       MIN     RWX
+       LDX     =-3
+       BRU*    RMX
+RDIN   LDA     RUX
+       LRSH    16
+       STB     RUX
+       BRU*    RMX
+RDQ    LDB     =RDD
+       STB     RMX
+       SKE     =152B
+       BRU     RDD
+       BRU*    RDI
+RDJ    ADM     RBX
+       MVA     =RDD,RMX
+       BRU*    RDI
+RDD    BNE     =135B,RDN
+       MVA     =RDJ,RMX
+       BRU*    RDI
+RDN    BNE     =0,RDB
+       MIN     RBX
+       BRU*    RDI
+RDB    SKE     =140B
+       ELSE    (BRU* RDI)
+       IFP     RBX,(BRU RDZ)
+RDC    BNE     RTX,RDW
+       GCD     P
+       BRU     RDO
+       MIN     P1
+       BEQ     =155B,RDO
+       BEQ     =200B,RDO
+RDP    LDA     =155B
+       WCI     P
+       MIN     LCT
+       RJS     P
+RDO    SBRM    STE
+       STZ     RDFLG
+RDY    LDA     RWX
+       SKG     =0
+       BRU     EIO
+       BRS     4
+       LDA     RWX
+       SUB     =RB
+       ADD     W
+       BRU     EIP
+RDZ    XMA     RBX
+       ADD     =201B
+       BRM     WOP
+       LDA     =-1
+       XMA     RBX
+       BRU     RDC
+RDW    BRM     WOP
+       SKE     =155B
+       BRU*    RDI
+       MIN     LCT
+       MVA     =RDQ,RMX
+       LDA     P1              (OPEN-CODED RJS)
+       CCW
+       SKB     =4B7
+       BRU     RDM
+       LDA     =1B5+200B
+       SKB     =2B7
+       LDA     =200B
+       ADM*    WOW
+       MIN     P1
+       SKA     =1B5
+       MIN     P1
+       LDA     =WOT-1
+       STA     WOX
+RDM    LDA     P1
+       SUB     BUF3
+       SKG     =M
+       BRU*    RDI
+       STX     RCX
+RCR    LDA     =RDY
+       MRG     =40000000B
+       STA     MXF
+       LDA     RDX1
+       ADD     =2
+       STA     RDX1
+       SBRM    CRS
+RCL    LDA     P1
+       CCW
+       STA     WOW
+       LDA     =WOT-1
+       STA     WOX
+       LDX     RCX
+       MVA     =-1,RDFLG
+       BRU*    RDI
+REC    LDA     RWX
+       SUB     =RB
+       ADM     W
+       IFP     WRF,(BRU RIB)
+REE    LDA     =IOPM
+       SBRM    MSG
+       BRU     RDP
+*W(RITE ON)
+WR     SKN     AI
+       ELSE    (BRU WRG)
+       SKA     =-1
+       BRU     WRG
+       MVA     =1,A
+       CNA
+       STA     AI
+       SBRM    LLF
+WRG    STA     RCX
+       SBRM    IVL
+       SBRM    GOF
+       MVA     =-1,WRFLG
+       LDA     RCX
+       SBRM    IVL
+WRGB   CLA                     ACQUIRE BLOCK TO BUFFER WRITE
+       BRS     120
+       BRU     REE             NO MEMORY LEFT, ERROR
+       CLB
+       RSH     12              PUT NEW BYTE IN MAP
+       STB     WRT1
+       BRS     43
+       XAB
+       MRG     WRT1
+       XAB
+       BRS     44
+       LDA     =RB-1           INITIALIZE TABLE AND BUFFER POINTERS
+       STA     RWX
+       LDA     =WT+1
+       STA     WTP
+WRI    GCVB    WRO             GET NEXT CHAR FROM INTERVAL
+       SKA     =300B
+       BRU     WRC
+WRW    CLB                     OPEN-CODED STORE CHAR IN BUFFER
+       MIN     WTP
+       EXU*    WTP
+       ADM*    RWX
+       MIN     W
+       SKE     =155B
+       BRU     GVC
+       LDA     =152B
+       BRU     WRW
+WRB    BLE     =200B,GVC
+       SUB     =201B
+       BLE     =0,WRW
+       ADD     =1
+       STA     WRT1
+       LDA     =135B
+WRN    CLB                     OPEN-CODED STORE CHAR IN BUFFER
+       MIN     WTP
+       EXU*    WTP
+       ADM*    RWX
+       MIN     W
+       LDA     WRT1
+       BRU     WRW
+WRO    LDA     =137B
+       CLB                     OPEN-CODED STORE CHAR IN BUFFER
+       MIN     WTP
+       EXU*    WTP
+       ADM*    RWX
+       MIN     RWX
+       SBRM    WBIO            WRITE OUT WHAT REMAINS IN BUFFER
+       STZ     WRFLG           UNSET WRITEFLAG, FILE NOW TERMINATED
+       LDA     =RB
+       BRS     4               RELEASE BLOCK USED FOR BUFFERS
+       LDA     W
+       ADD     =3
+       CCW
+       IFP     ROCN,(BRU EIO)
+EIP    LDB     =10
+       LDX     AFN1
+       BRS     36
+       LDA     =WWM
+       SBRM    MSG
+EIO    CLA
+       XMA     WRF
+       BRS     20
+       BRU     RAL
+WRC    SKA     =200B
+       BRU     WRB
+       SKE     =155B
+       BRU     WRW
+       LDB     =152B
+       STB     WRT1
+       BRU     WRN
+*WRITE EXECUTE TABLE
+WT     LSH     8
+       NOP
+       BRM     WW
+*SETUP FOR NEXT WORD IN WRITE BUFFER, INCLUDING WRITING THE
+*BUUFER ON THE FILE (WRF) IF IT IS FULL
+WWW    RSH     8               SHIFT CHAR INTO TOP BITS OF B
+       LDA     =WT-1
+       STA     WTP
+       MIN     RWX
+       LDA     RWX
+       SKE     =RB+4000B
+       BRU     WOWW
+       SBRM    WBIO
+       LDA     =RB
+       STA     RWX
+WOWW   CBA
+       BRR     WW
+*WROTE BUFFER OUT ON FILE
+WBIO   ZRO     WBIOZ
+       LDA     RWX
+       SUB     =RB
+       SKG     =0
+       BRU     WBIOO
+       LDX     =RB
+       BIO     WRF
+       BRU     REE
+WBIOO  LDX     =-4000B
+       CLA
+       STA     RB+4000B,2
+       BRX     *-1
+       SBRR    WBIO
+* D(ELETE)
+DL     SBRM    DEL
+       BRU     RAL
+*CHECK HIGH BOUNDARY
+CHH    ZRO     SRBZ
+       SKG     =-1
+       LDA     =1
+       STA     ILX
+       SBRM    LLF
+       BLE     =0,CE
+       ADD     =1
+       BLE     ILX,CE
+       LDA     ILX
+       SBRR    CHH
+* A(PPEND)
+APD    SKE     =0
+       SBRM    CHH
+       STA     ILX
+       LDA     =-1
+       CAX
+       LDB     =2
+       SBRM    GST
+APC    LDA     ILX
+       SKG     =0
+       BRU     APE
+       BRU     APR
+APE    LDA     ZE
+       SUB     =2
+       SBRM    FSS
+       MVA     P1,P
+       BRU     INJ
+APR    SBRM    FND
+       MVA     CRP,P
+       SLN     P,APS
+APS    FRJ     P
+       BRU     INJ
+* C(HANGE)
+CHN    SBRM    CHH
+       LDA     =-1
+       CAX
+       LDB     =2
+       SBRM    GST
+       LDA     ILX
+       SBRM    DEL
+CHE    MVA     A,ILX
+       LDA     ZE
+       SBRM    CNBL
+       BNE     ILX,INI
+       BRU     APE
+* I(NSERT)
+INS    SBRM    CHH
+       LDX     =-1
+       CXA
+       LDB     =2
+       SBRM    GST
+INI    LDA     ILX
+       SKG     =0
+       LDA     CUR
+       SBRM    FND
+       MVA     CRP,P
+INJ    LDA     S1
+       STA     NIR
+       BLE     S,RAL
+       SUB     S
+       CAB
+       ADD     P1
+       XMA     P1
+       XAB
+       ADD     P
+       STA     ILX
+       COPY    BX,AB
+       LDA     P
+       SBRM    MOVEP
+       LDA     S
+       LDB     P
+       LDX     S1
+       SBRM    MOVEP
+       SBRM    STE
+       LDA     ILX
+       CCW
+       CAB
+       LDA     =BUF
+       SBRM    CCR
+       ADD     NBL
+       SBRM    FND
+       BRU     RAL
+*BUFFER AREA TRIMMING
+BRL    LDA     R
+       CCW
+       LRSH    11
+       CAX
+       BRS     43
+       ETR     RMSK,2
+       ABC
+       LDX     =-4
+BVL    LSH     6
+       SKE     =0
+       BRS     121
+       CLA
+       BRX     BVL
+       BRU     RAL
+*RELABELLING MASK FOR BRL
+RMSK   DATA    777777B,7777B,77B,0
+*ADD 200'S TO RIGHT JUSTIFY STRING (X)
+RJE    LDA     1,2
+       CCW
+       SKB     =4B7
+       BRR     RJ
+       LDA     =200B
+       WCI     0,2
+       BRU     RJE
+*WORD JUSTIFY LEFT-HAND END OF STRING W/ POINTER IN X.
+WJ     ZRO     WJZ
+       LDA     0,2
+       CCW
+       CLA
+       LSH     2
+       CNA
+       ADD     =2
+       ADM     0,2
+       SBRR    WJ
+* WRITE CHARACTER ONTO P1 FOR 'READ'
+WOC    MIN     WOX
+       BRU*    WOX
+WOT    BRU     WO1
+       BRU     WO2
+       ADM*    WOW
+       LDB     =WOT-1
+       STB     WOX
+       MIN     P1
+       BRR     WOP
+WO1    MIN     WOW
+       MUL     =1B5
+       STB*    WOW
+       LSH     8
+       MIN     P1
+       BRR     WOP
+WO2    CLB
+       LSH     8
+       ADM*    WOW
+       RSH     8
+       MIN     P1
+       BRR     WOP
+*REALLOCATE TEXT
+RLMT   MVA     =-1,ILX
+       BRU     UFC
+RLNT   MVA     =GUM,MXF
+       MVA     =155B,RB
+       BRU     OFR+1
+RAL    MVA     =RLMT,MXF
+       STA     NIR
+       STA     ILX
+OFC    CLX
+OFL    LDA     Z,2
+       ETR     =777777B
+       SKG     =H
+       ELSE    (BRU OFR)
+       EAX     2,2
+       CXA
+       BNE     ZE,OFL
+       BRU     UFC
+OFR    STX     THX
+       LDA     THX
+       SBRM    FSS
+       MVA     =155B,RB
+       LDA     P1
+       SUB     BUF3
+       LRSH    1
+       ADD     BUF3
+       STA     P
+       SLN     P,CE
+       FRJ     P
+       LDA     P
+       SBRM    SPB
+UFC    CLX
+UFL    LDA     Z,2
+       ETR     =777777B
+       BLE     =L,UFR
+       EAX     2,2
+       CXA
+UFM    BNE     ZE,UFL
+       BRU     UFO
+UFR    STX     THX
+       BLE     =0,UFD
+       CNA
+       ADD     =M
+       STA     RAX
+       LDA     THX
+       SBRM    FSS
+       LDX     THX
+       EAX     2,2
+       CXA
+       BEQ     ZE,UFO
+       LDA     Z,2
+       ETR     =777777B
+       STA     RAX1
+       SKG     RAX
+       STA     RAX
+       LDA     Z,2
+       ETR     =77000000B
+       LRSH    6
+       STA     TA
+       BRS     43
+       XAB
+       MRG     TA
+       XAB
+       BRS     44
+       LDA     =RB+1
+       CWC
+       STA     P0
+       ADD     RAX1
+       STA     BMP1
+       LDA     P0
+       ADD     RAX
+       STA     BMP
+       SLN     BMP,UFN
+UFN    FRJ     BMP
+       LDA     P1
+       ADD     BMP
+       SUB     P0
+       XMA     P1
+       CCW
+       ADD     =1
+       STA     RAX
+       LDA     BMP
+       CCW
+       ADD     =1
+       STA     RAX1
+       CAX
+       LDB     RAX
+       LDA     =RB+1
+       SBRM    MOVER
+       LDA     BMP1
+       CCW
+       ADD     =1
+       CAX
+       LDB     =RB+1
+       LDA     RAX1
+       SBRM    MOVER
+       SBRM    STC
+       BRS     43
+       XAB
+       ETR     =7777B
+       XAB
+       BRS     44
+       LDA     THX
+       ADD     =2
+       SBRM    FSS
+       LDA     BMP1
+       SUB     BMP
+       ADD     BUF3
+       STA     P1
+       SBRM    STE
+       LDA     P1
+       BNE     BUF3,UFRC
+       LDA     SN
+UFE    SBRM    DSS
+UFRC   LDA     THX
+       CAX
+       BRU     UFM
+UFD    CXA
+       BRU     UFE
+UFO    LDA     ZE
+       SKG     =0
+       SBRM    CRS
+       SBRM    RLGN
+       IFP     ILX,(ELSE (BRU RLNT))
+       MVA     ROCN,NIR
+       IFP     ROCN,(BRU PPOUT)
+       BRU     CA
+* SPLIT BLOCK AT POINT INDICATED BY POINTER IN A REG
+SPB    ZRO     SPBZ
+       STA     P
+       LDA     SN
+       ADD     =2
+       STA     SPBX1
+       LDA     P
+       LDB     =RB*3+2
+       LDX     P1
+       SBRM    MOVEP
+       LDA     P
+       XMA     P1
+       SUB     P
+       STA     SPBX2
+       SBRM    STC
+       BRS     43
+       XAB
+       LSH     6
+       ETR     =77B6
+       CAX
+       BRS     43
+       XAB
+       ETR     =7777B
+       COPY    BA,XB,AB
+       BRS     44
+       LDA     SPBX1
+       SBRM    CRS
+       LDA     SPBX2
+       ADM     P1
+       SBRM    STE
+       SBRR    SPB
+* K(ILL)
+KIL    SBRM    BNV
+       LDX     BNWX
+       SBRM    BDL
+       BRU     BRL
+* '='
+EQ     SBRM    EVL
+       IFP     W,(BRU EQP)
+       TYPE    15B
+       LDA     W
+       CNA
+EQP    LDB     =10
+       LDX     AFN1
+       BRS     36
+EQZ    STZ     FTY
+       BRU     CR
+* B(UFFER)
+BT     SBRM    BNV
+       LDX     BNWX
+       MVA     =-1,FTY
+       MVP     (Q,2),V
+       TYPE    2
+       TYS     V,BTT
+BTT    TYPE    2
+       STA     FTY
+       BRU     CR
+*LOAD BUFFER, INDEX IN X
+LB     ZRO     KS
+       SBRM    BDL
+       LDA     S1
+       SUB     S
+       ADD     R1
+       ADD     =20
+       SKG     BUF3
+       ELSE    (BRU BLW)
+       CPYST   S,R
+       LDX     FN
+       MVP     R,(Q,2)
+       STB     R
+       FRJ     R
+       MVA     R,R1
+       SBRR    LB
+* G(ET)
+BLG    LDX     =-1
+       BRU     BLU
+BL     CLX
+BLU    STX     SGN
+       SBRM    IVL
+       MVA     SN,ASNX
+       MVA     VE,ACRX
+       SBRM    BNV
+       MVA     GB3,S
+       STA     S1
+BLL    GCVB    BLS
+       BEQ     =200B,BLL
+       WCI     S
+       BNCR    BLL
+       RJS     S
+       LDA     S1
+       SUB     S
+       BLE     =1440,BLL
+BLW    LDA     =WFM
+       SBRM    MSG
+       BRU     BRL
+*J(AM INTO)
+JMI    SBRM    BNV
+       LDA     =144B
+       LDB     =2
+       LDX     =-1
+       SBRM    GST
+       SBRM    CRLF
+       STA     SGN
+BLS    LDX     BNWX
+       SBRM    LB
+       SKN     SGN
+       BRU     BRL
+       MVA     =BRL-1,DELZ
+       MVA     CUR,A
+       LDA     ASNX
+       SBRM    FSS
+       MVA     ACRX,VE
+       BRU     DLL
+*GET BUFFER NAME VERIFIED
+BNV    ZRO     BNVZ
+       MVA     =CE,BNVF
+       BRU     BN
+BNM    ZRO     BNVZ
+       LDA     =BNQ
+       MRG     =40000000B
+       STA     BNVF
+BN     LDX     =-1
+       BRS     40
+       STA     SECHX
+       CLA
+       BRS     12
+       LDA     =3
+       SBRM    PO
+       SBRM    XI
+BNA    SKG     =72B
+       SKG     =17B
+       BRU*    BNVF
+       BLE     =40B,BNC
+       SUB     =27B
+BNK    CLB
+       LSH     1
+       IFP     BNVF,(BRU BNT)
+BNR    XMA     SECHX
+       LDX     =-1
+       BRS     12
+       LDX     SECHX
+       SBRR    BNV
+BNT    STA     BNWX
+       SBRM    XI
+       SKE     =16B
+       BRU*    BNVF
+       SBRM    CRLF
+       BRU     BNR
+BNC    BLE     =31B,BND
+       BRU*    BNVF
+BND    SUB     =20B
+       BRU     BNK
+BNQ    MIN*    BNV
+       BRU     BNR
+* Q(UICK)
+CPQ    CLA
+       STA     BVF
+       BRU     CA
+* V(ERBOSE)
+CPV    LDA     =-1
+       BRU     CPQ+1
+* '['
+SB     MVA     CUR,LSX1
+       LDA     =75B
+       LDB     =1
+       LDX     =-1
+       SBRM    GST
+       MVA     =-1,NSY
+       SBRM    ATSI
+       BRU     LSS
+       BRU     LSF
+*BEGIN SEARCH
+SRB    ZRO     SRBZ
+       SBRM    EVL
+       STA     THX
+       LDA     ZE
+       SBRM    CNBL
+       SUB     CUR
+       BLE     =1,SRT
+       LDA     CUR
+       ADD     =1
+SRT    LDB     THX
+       SKB     =-1
+       CBA
+       SBRM    FND
+       LOADB   0
+       BRR     SRBZ
+* ':'
+LSR    LDA     =32B
+       LDB     =1
+       LDX     =-1
+       STX     LSX
+       SBRM    GST
+       MVA     CUR,LSX1
+       MVA     =-1,NSY
+       LDA     S
+       SUB     S1
+       BLE     =-LLEN,LSF
+       SBRM    SRB
+       LDX     CRP
+LSM    LDA     P1
+LSL    CCW
+       CXB
+       ADD     =1
+       COPY    BA,AX
+       CCW
+       CXB
+       ADD     =1
+       SBRM    LD
+       BRU     LSN
+LSS    MVA     CUR,W
+       CLA
+       LDX     =-1
+       BRS     12
+       BRU     CV
+LSN    IFP     LSX,(BRU LSF)
+       LDA     SN
+       ADD     =2
+       SKE     ZE
+       ELSE    CLA
+       SBRM    FSS
+       LDA     SN
+       BEQ     FSX,LSE
+       LDX     BUF3
+       BRU     LSM
+LSE    STZ     LSX
+       LDX     BUF3
+       LDA     CRP
+       BRU     LSL
+LSF    LDA     LSX1
+       SBRM    FND
+       BRU     CE
+* ATSIGN
+ALL    MVA     =1,A
+       MVA     =-1,AI
+       STZ     W
+       STA     SGN
+* '$'
+LL     SBRM    LLF
+       BRU     DOT+1
+* T(ABS)
+TBS    MVA     =-NTAB,W
+TBN    SBRM    GNM
+       LDA     N
+       BLE     =80,TBT
+TBE    TYPE    37B
+       BRU     TBN
+TBT    LDX     W
+       STA     TSE,2
+       LDA     CC
+       BRX     TBM
+       BNE     =16B,TBE
+       BRU     CR
+TBM    STX     W
+       BEQ     =14B,TBN
+       BNE     =16B,TBE
+       CLA
+       STA     TSE,2
+       BRX     *-1
+       BRU     CR
+*EDIT SUBROUTINE
+EDS    ZRO     EDSX
+EDE    MVA     P1,BMP
+       STA     BMP1
+EDO    GC      P,EDH
+EDP    SKA     =200B
+       BRU     EDB
+       WCI     BMP
+       IFP     W,(SBRM TO)
+       BNCR    EDO
+       MVA     =-1,AI
+       SBRR    EDS
+EDH    LDX     P1
+       LDA     P
+       ADD     =1
+       STA     P1
+       GC      P,CE
+       STX     P1
+       BRU     EDP
+EDB    SUB     =201B
+       STA     N
+       CLA
+EDR    WCI     BMP
+       IFP     W,(SBRM TO)
+       DB      N,EDR
+       BRU     EDO
+* M(ODIFY)
+EDM    LDB     =-1
+       BRU     EDG
+* E(DIT)
+ED     CLB
+EDG    STB     GEM
+       STA     EDX
+       SBRM    CHH
+       SBRM    IVL
+       MVA     AJ,EUX
+       MVA     A,ELX
+       CAX
+       LDA     =-1
+       LDB     =2
+       SBRM    GST
+       LDA     EDX
+       SBRM    DEL
+       BRU     CHE
+* '«'
+PSY    SBRM    EVL
+       SBRM    FND
+       STZ     W
+       MVA     =-1,FTY
+       MVA     CRP,P
+       MVA     BUF03,P0
+PSG    GCD     P0
+       BRU     PSP
+       BNCR    PSG
+       STZ     ILX
+       MIN     P
+PSJ    GC      P,CE
+       BNE     =200B,PSH
+       MIN     ILX
+       BRU     PSJ
+PSH    BLE     =0,PSI
+       BEQ     =155B,PSI
+       BLE     =177B,PSF
+PSI    MIN     W
+       LDA     ILX
+       ADD     =2
+       CNA
+       ADM     P
+       BRU     PSG
+PSF    STA     P0
+       TYPE    32B
+       LDA     P0
+       BRU     PSO
+PSL    GC      P,CE
+       BNI     =72B,=17B,PSC
+       BNI     =40B,=31B,PSO
+PSC    TYPE    32B
+       LDA     W
+       STA     FTY
+       BLE     =0,CR
+       BRU     EQP
+PSO    SBRM    TO
+       BRU     PSL
+PSP    LDA     SN
+       BLE     =0,PSV
+       SUB     =2
+       SBRM    FSS
+       MVA     BUF03,P0
+       MVA     P1,P
+PSE    GCD     P0
+       BRU     PSP
+       BNCR    PSE
+       BRU     PSG
+PSV    LDA     CUR
+       BRU     EQP
+*GET RESPONSE: YES, SKIP TWO  NO, SKIP ONE  OTHER, DON'T SKIP
+GR     ZRO     SRBZ
+       CLA
+       LDX     =-1
+       BRS     12
+       SBRM    TI
+       BNE     =71B,GRN
+       LDA     =SYM
+       SBRM    MSG
+       LDA     =2
+GRS    ADM*    GR
+       SBRM    CRLF
+GRO    LDA     CC
+       SBRR    GR
+GRN    BNE     =56B,GRO
+       TYPE    57B
+       LDA     =1
+       BRU     GRS
+*SKIP IF NEXT CHAR FROM BUFFER
+BSK    ZRO     FSSX
+       STA     TA
+       LDA     QQ1
+       BLE     QQ,BSKC
+BSKS   MIN*    BSK
+BSKO   LDA     TA
+       SBRR    BSK
+BSKC   LDA     QN
+       BNE     =-40,BSKS
+       BRU     BSKO
+*LITERAL GET NEXT CHAR (FROM TTY OR BUFFER)
+XI     ZRO     XOUX
+       GC      QQ,XII
+       BNE     =200B,XIOB
+       BRU     XI+1
+XII    LDA     QQ1
+       BNE     QQ,XIN
+       LDA     QN
+       BNE     =-40,XIB
+       SBRM    PI
+       IFP     IBE,(STA CFRO)
+       BRU     XIO
+XIN    SKR     QQ
+       BRU     XIA
+XIOB   SKE     =155B
+       SBRR    XI
+       SBRM    PO
+XIO    SKE     =155B
+       SBRR    XI
+       LDA     =152B
+       SBRM    PO
+       LDA     =155B
+       SBRR    XI
+XIA    SKG     =0
+       SBRM    PO
+       SKG     =1
+       CLA
+       BRU     XIO
+XIB    SUB     =2
+       STA     QN
+       CAX
+       LDP     QP,2
+       STP     QQ
+       BRU     XI+1
+* LOGICAL TYPE-IN
+TI     ZRO     TOUX
+       IFP     CFRO,(BRU TIC)
+       CLA
+       LDX     =-1
+       BRS     13
+       ELSE    (STA IBE)
+TIC    SBRM    XI
+       SKG     =77B
+       MIN     CN
+TBF    BNE     =142B,TCR
+       SBRM    BNM
+       ELSE    (BRU TIQ)
+TIX    GCD     Q,2
+       BRU     TIC
+       BEQ     =200B,TIX
+       MIN     Q1,2
+       LDP     Q,2
+TIG    XMA     QQ
+       SKE     QQ1
+       BRU     TIW
+TIH    STB     QQ1
+       BRU     TI+1
+TIW    LDX     QN
+       BRX     TIY
+       BRU     CE
+TIY    XAB
+       XMA     QQ1
+       XAB
+       STP     QP0,2
+       BRX     *+1
+       STX     QN
+       BRU     TI+1
+TCR    BNCR    TTB
+       CLB
+       STB     CN
+       BRU     TIO
+TTB    BNE     =151B,TMB
+       CLB
+TIS    MIN     CN
+       LDX     =-NTAB
+TIL    LDA     TSE,2
+       SUB     CN
+       SKG     =0
+       BRX     TIL
+       SKR     CN
+       SKG     =0
+       BRU     TIQB
+TIM    STA     PX
+       CBA
+       ADD     PX
+       BRU     TIG
+TIO    STA     CC
+       SBRR    TI
+TIQB   LDA     =147B
+       BRU     TIQ+1
+TIQ    LDA     =37B
+       SBRM    PO
+       BRU     TI+1
+TMB    BLE     =177B,TIO
+       SUB     =200B
+       LDB     =1
+       BRU     TIM
+* TYPE C.R., L.F.
+CRLF   ZRO     TOUX
+       LDA     =155B
+       BRU     TOC
+* LOGICAL TYPE-OUT
+TO     ZRO     TOUX
+       MIN     CN
+       STA     CC
+       SKA     =200B
+       BRU     TOS
+       SKE     =152B
+       SKG     =77B
+       BRU     TOC
+       BNCR    TOA
+TOC    SBRM    PO
+       SKE     =155B
+       BRU     TOL
+TOR    LDA     =152B
+       SBRM    PO
+       STZ     CN
+TOL    LDA     CC
+       SBRR    TO
+TOA    LDA     =6
+       SBRM    PO
+       LDA     CC
+       ETR     =77B
+       BRU     TOC
+TOS    SKR     CN
+       LDA     =135B
+       SBRM    PO
+       LDA     CC
+       ETR     =177B
+       ADM     CN
+       SBRM    PO
+       LDA     CC
+       SBRR    TO
+* PHYSICAL TYPE-IN
+PI     ZRO     PX
+PIB    CLA
+       SKR     U
+       BRU     PIX
+       STA     U
+PIC    CIO     AFN
+       BNE     =137B,PIT
+       LDA     AFN1
+       BNE     =1,PIR
+       LDA     =144B
+       BRU     PIW
+PIR    LDA     =137B
+PIW    CIO     AFN1
+PIQ    BRS     10
+PIT    BNE     =135B,PIX
+       CIO     AFN
+       STA     U
+       BRU     PIB
+PIX    STA     CC
+       SBRR    PI
+* PHYSICAL TYPE-OUT
+PO     ZRO     PX
+       SKN     FTY
+       SKBS
+       CIO     AFN1
+       SBRR    PO
+* EVALUATE
+EVL    ZRO     EVLX
+       IFP     NSY,(BRU EV3)
+       CLA
+       XMA     NSY
+       BNE     =-1,EV2
+       BRU     EV1
+EV2    SKN     WSY
+       ELSE    (BRU CE)
+EV1    STA     WSY
+EV3    LDA     N
+       IFP     SGN,(ELSE (CNA))
+       ADD     W
+       STA     W
+       SBRR    EVL
+* SET UP INTERVAL
+IVL    ZRO     EVLX
+       LDB     A
+       IFP     AI,(BRU IVF)
+       SKG     =0
+       LDA     =1
+IVS    STB     A
+       STA     AJ
+       SUB     A
+       BLE     =-1,CE
+       STA     ILX
+       MIN     ILX
+       ADD     A
+       SBRM    FND
+       MVA     CRP,P
+       SLN     P,IVC
+IVC    GC      P,IVT
+       BEQ     =200B,IVC
+       SKR     P
+IVT    MVA     P,V
+       MVA     SN,VX
+       LDA     A
+       SBRM    FND
+       LDA     VX
+       ADD     =2
+IVR    CAB
+       ADD     =Z
+       MRG     =20000000B
+       STA     TA
+       CBA
+       SUB     SN
+       CNA
+       STA     VX
+       CAX
+VIL    LDA*    TA
+       ETR     =777777B
+       ADD     BUF3
+       CAB
+       LDA     BUF3
+       STP     VE,2
+       EAX     1,2
+       BRX     VIL
+       LDX     VX
+       MVA     CRP,(VE,2)
+       LDX     =-1
+       MVA     V,(VE,2)
+IVO    SBRM    SGV
+       SBRR    IVL
+IVF    CAB
+       BNE     =0,IVS
+       LDA     CUR
+       CAB
+       BRU     IVS
+*RESTORE RELABELLING FOR GST
+RER    ZRO     RERZ
+       SBRR    RER
+*DECREASE CORE IN RELABELLING FOR GST
+DER    ZRO     DERZ
+       SBRR    DER
+*INITIALIZE THINGS FOR GCF
+IGCF   ZRO     TOUX
+       ADD     =1
+       CCW
+       STA     WA
+       CLA
+       LCY     2
+       ADD     =FCYT-1
+       STA     CJ
+       SBRR    IGCF
+*GET NEXT WORD FOR GCF
+NXWR   MIN     WA
+       XMA     CJ
+       SUB     =3
+       XMA     CJ
+       BRR     NXW
+* PAGE EJECT FOR 'PRINT'
+PEJ    ZRO     TX
+       LDA     =53
+       SKG     PCX
+       SBRR    PEJ
+       LDA     =152B
+       MIN     PCX
+       BRU     PEK+1
+PEK    CIO     AFN1
+       SKR     PCX
+       BRU     PEK
+       LDA     =NPM
+* TYPE OUT MESSAGE
+MSG    NOP     TX
+       STX     ANG
+       LDB     =-1
+       LDX     AFN1
+       BRS     34
+       LDX     ANG
+       SBRR    MSG
+* FIND LINE
+FND    ZRO FNDX;  SUB =1;  SKG =0;  CLA;  STA FLX;  SKG =0;  BRU FNSP
+       COPY A,X
+FLL    XXA;  ETR =37777B;  SKE ZE;  BRU *+2;  BRU FNE
+       XXA;  EAX 1,2;  ADD Z,2;  EAX 1,2;  SKG FLX;  BRU FLL
+       CXA;  ETR =37777B;  SUB =2;  SBRM FSS;  MIN FLX
+       LDA FLX;  SUB NBL;  STA TCRP
+       LDA P1;  CCW;  ADD =1;  CAB;  MRG =2B7;  STA TA
+       CBA;  SUB =BUF0;  CNA;  CAX
+       LDB =377B
+FLD    SKR TCRP;  BRU *+2;  BRU FNF;  EAX 1,2
+FLDL   LDA* TA
+       SKM =155B;  BRU *+2;  BRU FLD
+       SKM =200B;  BRX FLDL;  SKM =200B;  BRU FNE;  BRU FLD
+
+FNF    CXA;  XMA TA; ETR =37777B;  ADD TA;  ADD =1;  CWC
+FNS    STA     CRP
+       STA     P
+FNI1   GC      P,FNI2
+       BNCR    FNI1
+FNI3   GC      P,FNI2
+       BEQ     =200B,FNI3
+       SKR     P
+FNI2   MVA     P,CRP1
+       MVA     CRP,P
+       MVA     SN,FSX
+       LDA     FLX
+       STA     CUR
+       SBRR    FND
+FNE    LDA     FSX
+       SBRM    FSS
+       BRU     CE
+FNSP   SBRM FSS;  LDA BUF3;  MIN FLX;  BRU FNS
+
+* GET NUMBER
+GNM1   ZRO     TX
+       SUB     =20B
+       STA     N
+       BRU     GNN
+GNM    ZRO     TX
+       STZ     N
+GNN    SBRM    TI
+       SKG     =31B
+       SKG     =17B
+       SBRR    GNM
+       XMA     N
+       MUL     =5
+       CBA
+       SUB     =20B
+       ADM     N
+       BRU     GNN
+* GET INPUT FILE
+GIF    ZRO     GFIX
+       CLB
+       LDA     AFN1
+       LCY     12
+       MRG     AFN
+       IF      -BBN
+       COPY    AX,A,B
+       ENDF
+       BRS     15
+       BRU     CE
+       IF      BBN
+       BRS 16;  BRU CE
+       ENDF
+       STA     WRF
+       CBA
+       BNE     =16B,CEF
+       BRU     GFS
+*SET UP NEW OLD LINE FOR EDIT ROUTINE
+OIE    ZRO     OIEZ
+       XMA     LC1
+       STA     BMP
+       STA     BMP1
+       XMA     LC1
+       BRX     OIP
+       LDX     GEM
+       STX     OTX
+       IFP     COX,(BRU OIG)
+       BRU     OIT
+OIP    STP     S
+       STX     OTX
+OIL    GC      S,OIT
+       IFP     OTX,(SBRM TO)
+       SKA     =200B
+       BRU     OIB
+OIW    WCI     BMP
+       BNCR    OIL
+OIO    MVA     BMP1,S
+       STA     S1
+       SBRR    OIE
+OIB    BLE     =200B,OIL
+       SUB     =200B
+       CNA
+       AXC
+       WCI     BMP
+       BRX     *-1
+       BRU     OIL
+OIT    LDA     =155B
+       BRU     OIW
+OIG    STA     COX
+       SKG     EUX
+       ELSE    (BRU OIT)
+       SBRM    FND
+       MVA     CRP,S
+       MVA     P1,S1
+       BRU     OIL
+*EDIT WRITE CHAR ON BUFFER1 A/O OUTPUT LINE IF NECESSARY
+EWR    ZRO     EWRZ
+       STA     ECX
+       IFP     KS,(BRU EWC)
+       WCI     S
+       BNCR    EWC
+       LDA     =200B
+       WCI     S
+       WCI     S
+       LDA     =155B
+EWC    IFP     LS,(BRU EWO)
+       LDA     B1
+       SUB     B
+       BLE     =140,EWW
+       IFP     EBX,(BRU EWO)
+       LDA     =B1M
+       STA     EBX
+       SBRM    MSG
+       BRU     EWO
+EWW    LDA     ECX
+       WCI     B
+       MVA     =-1,EBX
+EWO    LDA     ECX
+       SBRR    EWR
+*WRITE COMPACTED STRING
+WCS    ZRO     WCSZ
+       STP     V
+       STX     WCP
+       STX     WCP1
+       MVA     =-1,WBX
+       STZ     WLX
+WCL    GC      V,WCO
+       SKA     =200B
+       BRU     WCB
+       BNE     =0,WCC
+       MIN     WBX
+       BRU     WCL
+WCB    ETR     =177B
+       ADM     WBX
+       BRU     WCL
+WCC    SKN     WBX
+       ELSE    (BRU WCW)
+       XMA     WBX
+       ADD     =201B
+       WCI     WCP
+       LDA     =-1
+       XMA     WBX
+WCW    WCI     WCP
+       BNCR    WCL
+       MIN     WLX
+       RJS     WCP
+       BRU     WCL
+WCO    LDA     WBX
+       ADD     =201B
+       IFP     WBX,(WCI WCP)
+       LDP     WCP
+       SBRR    WCS
+*GENERAL BACKSPACE. A:BACKING CHAR, B:---, S:ADDR. OF POINT. TO STRING
+GBS    ZRO     GBSZ
+       STA     GRX
+       MVA     =-1,GQX
+       STZ     GHX
+GBL    GCD     0,2
+       BRU     GBE
+       BEQ     =200B,GBL
+       MIN     GHX
+       SKE     GRX
+       STA     GQX
+       BNE     GRX,GBN
+       BNCR    GBC
+       XMA     GQX
+       BLE     =-1,GBL
+       BRU     GBT
+GBC    IFP     GQX,(ELSE (BRU GBL))
+GBT    MIN     1,2
+       SKR     GHX
+       LDA     GHX
+GBP    STA     GHX
+       GCD     0,2
+       BRU     GBO
+       WCI     0,2
+       BNCR    GBO
+       BRM     RJ
+GBO    LDA     GHX
+       SBRR    GBS
+GBN    BNCR    GBL
+       MIN     0,2
+GBE    LDA     =-1
+       BRU     GBP
+*GET STRING. A:TER CHAR (-1 FOR EDIT MODE), B:ECHO #, X:# OF EDIT LINE.
+GST    ZRO     GSTZ
+       STA     GTX
+       STX     COX
+       SKN     COX
+       ELSE    (STB EUX)
+       CBA
+       LDX     =-1
+       BRS     12
+       SBRM    DER
+       MVA     =-1,KS
+       STA     GMX
+       STA     ES
+       STA     YS
+       CNA
+       STA     LS
+       STA     LOS
+       IFP     GTX,(STA ES)
+       MVA     GB3,LC
+       STA     LC1
+       STA     S
+       STA     S1
+       MVA     GB13,B
+       STA     B1
+       IFP     GTX,(BRU GSI)
+       LDA     COX
+       LDX     =-1
+       SBRM    OIE
+GSI    MVA     GTX,GSPF
+       SBRM    TI
+       BNE     GTX,GSG
+GSB    SBRM    RER
+GSC    IFP     GTX,(BRU GDT)
+       GCD     LC
+       BRU     GSF
+       MIN     LC1
+       BEQ     =200B,GSF
+       BEQ     =155B,GSF
+       LDA     =155B
+       WCI     LC
+       RJS     LC
+GSF    MVP     LC,S
+GSO    STZ     GSPF
+       SBRR    GST
+GSG    BNI     =172B,=140B,GSN
+       CAX
+       LDA     CCT-141B,2
+       SKN     GTX
+       SKG     =37777B
+       BRU*    CCT-141B,2
+GSX    CXA
+GSN    SBRM    EWR
+       IFP     ES,(BRU GSE)
+       GC      BMP,GSR
+       BNCR    GSW
+GSR    SKR     BMP
+GSW    LDA     ECX
+GSE    BNI     =177B,=77B,GSI
+       BEQ     =152B,GSI
+       SKE     =155B
+       SBRM    TO
+       BRU     GSI
+GSM    LDA     S1
+       SUB     GB3
+       BLE     =1350,GSI
+       SKG     =1440
+       ELSE    (BRU GSD)
+       IFP     GMX,(BRU GSI)
+       LDA     =NFM
+       SBRM    MSG
+       SBRM    CRLF
+       MVA     =1,GMX
+       BRU     GSI
+GSD    LDA     =ETM
+       SBRM    MSG
+       MVA     QQ,QQ1
+       SBRM    CRLF
+       BRU     GDT
+GCA    TYPE    76B
+       IFP     KS,(BRU GAC)
+       LDA     S1
+       BLE     S,GAN
+       SKR     S1
+       BRU     GAC
+GAN    SBRM    CRLF
+       MVA     =2,CN
+GAC    IFP     LS,(BRU GAO)
+       LDA     B1
+       BLE     B,GAO
+       SKR     B1
+GAO    LDA     =-2
+       ADM     CN
+       BRU     GSI
+GCN    IFP     ES,(BRU GCA)
+       LDA     BMP
+       BLE     LC1,GCA
+       SKR     BMP
+       BRU     GCA
+GCC    GC      BMP,GSQR
+       SKG     =77B
+       SBRM    TO
+       BEQ     =155B,GSQR
+       SBRM    EWR
+       BRU     GSW
+GSQR   SKR     BMP
+GSQ    LDA     =147B
+       SBRM    PO
+       BRU     GSI
+GCD    IFP     COX,(BRU GDL)
+       GC      BMP,GD
+       SKR     BMP
+       BNCR    GDL
+GD     GCD     S
+       BRU     GDD
+       MIN     S1
+GDE    BEQ     =200B,GDT
+       BEQ     =155B,GDT
+       BRU     GDL
+GDD    GCD     LC
+       BRU     GDT
+       MIN     LC1
+       BRU     GDE
+GDL    GCI     BMP
+       LDA     =155B
+       SBRM    EWR
+       SBRM    TO
+       BNCR    GDL
+       LDA     COX
+       BLE     =-1,GDT
+GDM    LDP     S
+       LDX     LC1
+       SBRM    WCS
+       STB     LC1
+       STB     S
+       STB     S1
+       IFP     LOS,(BRU GDN)
+       LDX     Q2
+       LDP     B
+       SBRM    WCS
+       STP     Q2
+       STB     R
+       STB     R1
+GDN    MVA     =-1,ES
+       STA     KS
+       CNA
+       STA     LS
+GSS    CLX
+       IFP     GTX,(BRU GSM)
+       LDA     COX
+       ADD     =1
+       SKG     EUX
+       ELSE    (BRU GDT)
+       SBRM    OIE
+       BRU     GSM
+GDT    LDP     S
+       LDX     LC1
+       SBRM    WCS
+       STB     LC1
+       IFP     GTX,(BRU GSF)
+       BRU     GSB
+GCE    LDA     ES
+       CNA
+       XMA     ES
+       ADD     =35B
+GSP    SBRM    PO
+       BRU     GSI
+GCF    GC      BMP,GFN
+       SBRM    EWR
+       BNCR    GCF
+       BRU     GFM
+GFN    LDA     =155B
+       SBRM    EWR
+GFM    SBRM    TO
+       BRU     GDM
+GCH    GC      BMP,GHR
+       BEQ     =155B,GHR
+       SBRM    EWR
+       SBRM    TO
+       BRU     GCH
+GHR    SKR     BMP
+       BRU     GSI
+GCK    LDA     KS
+       CNA
+       STA     KS
+       LDA     =2
+       BRU     GSP
+GCL    IFP     LOS,(BRU GLN)
+       IFP     LS,(BRU GLL)
+       LDX     Q2
+       LDP     B
+       SBRM    WCS
+       STP     Q2
+       STB     R
+       STB     R1
+GLL    LDA     LS
+       CNA
+       STA     LS
+       ADD     =74B
+       BRU     GSP
+GLN    MVA     =-1,LOS
+       LDA     =1
+       SBRM    BDL
+       MVA     R,Q2
+       BRU     GLL
+GCM    LDA     =155B
+       SBRM    EWR
+       BRU     GDM
+GCT    SBRM    CRLF
+       LDA     BMP1
+       SUB     =1
+       BLE     BMP,GTE
+       LDA     S1
+       SUB     S
+       ADD     =200B
+       SBRM    TO
+       BRU     GTE
+GCR    TYPE    152B
+GTE    MVP     BMP,V
+GDW    GCI     V
+       LDA     =155B
+       SBRM    TO
+       BNCR    GDW
+       MVP     S,V
+       TYS     V,GSI
+GCP    LDX     =GDXD
+       BRU     GDOP
+GCO    LDX     =GDA
+GDOP   LDA     =-1
+       BRU     GDXZ
+GCZ    LDX     =GDA
+GDX    CLA
+GDXZ   STA     TOP
+       STX     SGN
+       MVA     BMP,FNDX
+       LDX     =-1
+       LDA     =3
+       BRS     12
+       SBRM    TI
+       SKA     =200B
+       CLA
+       STA     XZX
+       SKG     =77B
+       SKR     CN
+       LDX     =-1
+       LDA     =2
+       BRS     12
+       IFP     TOP,(BRU GDK)
+       MIN     BMP
+GDK    GC      BMP,GDU
+       BEQ     =155B,GDU
+       BNE     XZX,GDK
+       LDA     FNDX
+       SUB     BMP
+       SUB     TOP
+       CAX
+       MVA     FNDX,BMP
+GDXL   GC      BMP,GDU
+       STA     XZX
+       BRU*    SGN
+GDA    SBRM    EWR
+       SBRM    TO
+GDXE   BRX     GDXL
+       BRU     GSI
+GDXD   LDA     =5
+       SBRM    TO
+       CLA
+       XMA     XZX
+       SKG     =77B
+       BRU     GDXE
+       SKR     CN
+       BNE     =152B,GDXD
+       BRU     GDXE
+GDU    MVA     FNDX,BMP
+       BRU     GSQ
+GCX    LDX     =GDXD
+       BRU     GDX
+GCS    GC      BMP,GSQR
+       BEQ     =155B,GSQR
+       BLE     =77B,GSSM
+       LDA     =5
+       SBRM    PO
+GSSM   LDA     =5
+       BRU     GSP
+GCU    LDB     =143B
+       BRU     TIS
+GCV    SBRM    XI
+       MIN     CN
+       BRU     GSN
+GCY    GC      BMP,GYN
+       SBRM    EWR
+       BNCR    GCY
+GYN    LDP     S
+       LDX     =-2
+       SBRM    OIE
+       MVA     =1,YS
+       SBRM    CRLF
+       BRU     GSI
+GCW    TYPE    74B
+       SKR     CN
+       IFP     KS,(BRU GWO)
+       CLA
+       LDX     =S
+       SBRM    GBS
+       BLE     =-1,GMC
+       CNA
+       ADM     CN
+       BRU     GWO
+GMC    SBRM    CRLF
+GWO    BRU     GSI
+GCQ    MVA     =-1,TA
+       LDA     BMP
+       SUB     LC1
+       ADD     S1
+       SUB     S
+       ADM     TA
+       MVA     LC1,BMP
+       IFP     GTX,(BRU GQT)
+       IFP     TA,(BRU GQC)
+       BRU     GQN
+GQT    LDA     S1
+       BLE     S,GQB
+       BRU     GQC
+GQB    LDX     =LC
+       LDA     =155B
+       SBRM    GBS
+       MVA     LC1,S
+GQC    MVA     S,S1
+GQO    TYPE    77B
+       SBRM    CRLF
+       BRU     GSI
+GQN    IFP     YS,(BRU GQY)
+       LDX     =LC
+       LDA     =155B
+       SBRM    GBS
+       LDA     COX
+       BLE     =-1,GQE
+       BLE     ELX,GSQ
+       SKR     COX
+GQE    TYPE    77B
+       SBRM    CRLF
+       LDA     COX
+       SBRM    OIE
+       BRU     GSI
+GQY    MVA     =-1,YS
+       BRU     GQE
+*FINISHED
+FIN    SBRM    LLF
+       SKG     =0
+       BRS     10
+       LDA     COMIX
+       SKE     =46B
+       ELSE    (BRS 10)
+       SKE     =67B
+       ELSE    (BRS 10)
+       LDA     =WOM
+       SBRM    MSG
+       BRS     10
+*SUBSTITUTE
+SS     SBRM    IVL
+       LDA     VX
+       ADD     =2
+       CNA
+       ADD     SN
+       STA     ASNX
+       MVA     A,ACURX
+       MVA     V,ACRX
+       STZ     SSLX
+       STA     SSWX
+       STA     NLL
+       STA     SSCX
+       MVA     GB13,PLLP
+       STA     PLLP1
+       MVA     =37777777B,SSKX
+SS1    SBRM    SSTI
+       STA     A
+       CLB
+       STB     CN
+       LDX     =-1
+       SBRM    GST
+       MVP     S,V
+SS2    GC      V,SS3
+       BNCR    SS2
+       BRU     CE
+SS3    LOADB   1
+       IFP     BVF,(BRU SS4)
+       LDA     =SIM
+       SKBS
+       SBRM    MSG
+       LDA     A
+       SBRM    TO
+SS4    LDA     A
+       CLB
+       STB     CN
+       LDX     =-1
+       SBRM    GST
+       SBRM    CRLF
+       MVP     S,V
+SS5    GC      V,SSG
+       BNCR    SS5
+       BRU     CE
+SSG    LOADB   0
+       SBRM    ABSS
+       BRU     SSH
+SSO    IFP     SSLX,(BRU SSO1)
+SSO2   GC      PLLP,SSO1
+       SBRM    TO
+       BRU     SSO2
+SSO1   LDA     SSCX
+       SKBS
+       ELSE    (BRU BRL)
+       LDB     =10
+       LDX     =1
+       BRS     36
+       SBRM    CRLF
+       LDA     AJ
+       SBRM    FND
+       BRU     BRL
+SSH    MVA     SRP,P
+       MVP     S,BMP
+       STZ     TCRP
+SSK    GC      BMP,SSI
+       GC      P,CE
+       BRU     SSK
+SSI    MVA     P,SRP1
+       STA     TCRP1
+SSH1   IFP     SSLX,(BRU SSJ)
+       LDA     CUR
+       BLE     NLL,SSJ
+       MVP     PLLP,V
+       STA     PLLP1
+       TYS     V,SSJ
+SSJ    IFP     SSWX,(BRU SSS)
+       MVA     CRP,V
+       MVA     SRP,V1
+       TYS     V,SSJ2
+SSJ2   TYPE    2B
+       MVP     SRP,V
+       TYS     V,SSJ3
+SSJ3   TYPE    2B
+       MVA     SRP1,P
+SSJ5   GC      P,CE
+       SBRM    TO
+       BNCR    SSJ5
+SSJ4   SBRM    SSTI
+       STA     A
+       SBRM    CRLF
+       LDA     A
+       BNE     =63B,SSR
+SSS    LDX     =2
+       MVP     (Q,2),V
+       IFP     APBX,(ELSE (BRU SSU))
+       GC      SRP,CE
+       SUB     APBX
+       BNE     =0,SST
+       SKR     SRP
+       BRU     SSU
+SST    MRG     =200B
+       WCD     SRP
+       MIN     SRP
+SSU    IFP     ATBX,(ELSE (BRU SSV))
+       MVA     =1,TCRP
+       GCD     SRP
+       BRU     CE
+       SUB     ATBX
+       BNE     =0,SSW
+       MIN     SRP1
+       BRU     SSV
+SSW    MRG     =200B
+       WCI     SRP
+       SKR     SRP1
+SSV    SKR     SRP
+       GC      SRP,CE
+       BLE     =200B,SSCH
+       STA     TA
+       GC      V,SSCH
+       BLE     =200B,SSZ
+       ETR     =177B
+       ADD     TA
+       WCD     SRP
+       MIN     SRP
+       BRU     SSCH
+SSZ    SKR     V
+SSCH   MIN     SRP1
+       GCD     SRP
+       BRU     CE
+       BLE     =200B,SSE
+       STA     TA
+       GCD     V
+       BRU     SSE
+       BLE     =200B,SSA
+       ETR     =177B
+       ADD     TA
+       WCI     SRP
+       SKR     SRP1
+       MVA     =1,TCRP
+       BRU     SSE
+SSA    MIN     V1
+SSE    MVA     GB13,BMP
+       LDA     SRP
+       ADD     =1
+       CCW
+       CLA
+       LSH     2
+       ADD     BMP
+       STA     BMP
+       STA     BMP1
+       STA     KS
+SSB    GC      V,SSF
+       WCI     BMP
+       BRU     SSB
+SSF    LDA     BMP1
+       ADM     TCRP
+       MVA     SRP1,P
+SSSC   GC      P,CE
+       WCI     BMP
+       BNCR    SSSC
+       RJS     BMP
+       LDA     BMP1
+       SUB     BMP
+       ADD     SRP
+       CCW
+       ADD     =1
+       STA     TA
+       LDA     P
+       CCW
+       ADD     =1
+       STA     TA1
+       SUB     TA
+       CAX
+       SKG     =0
+       CNA
+       MUL     =30000000B
+       LSH     2
+       CXB
+       SKB     =40000000B
+       ELSE    (CNA)
+       CAB
+       LDA     SN
+       BNE     ASNX,SCC
+       CBA
+       ADM     ACRX
+SCC    CBA
+       ADD     P1
+       XMA     P1
+       CCW
+       ADD     =1
+       CAX
+       LDA     TA1
+       LDB     TA
+       SBRM    MOVER
+       MVA     SRP,SRP1
+SSSL   GC      BMP,SSLI
+       WCI     SRP
+       BRU     SSSL
+SSLI   MVA     CUR,NLL
+       MVA     PLLP,PLLP1
+       MVA     CRP,P
+SSLL   GC      P,CE
+       WCI     PLLP
+       BNCR    SSLL
+SSSA   LDA     TCRP
+       SUB     KS
+       ADD     SRP
+       MIN     SSCX
+       DB      SSKX,SSSB
+       BRU     SSO
+SSR    LDA     TCRP1
+SSSB   SBRM    ATS
+       BRU     SSH
+       BRU     SSO
+SSTI   ZRO     ATSZ
+SSTI3  SBRM    XI
+SSTI4  BLE     =0,SSTI3
+       SKE     =32B
+       SBRR    SSTI
+       SBRM    XI
+       LDX     =OPTB-OPTE
+       SKE     OPTE,2
+       BRX     *-1
+       SKE     OPTE,2
+       BRU     SSTI1
+       EXU     OPTE-2,2
+       EXU     OPTE-1,2
+       STA     SSLX
+       STB     SSWX
+       BRU     SSTI3
+SSTI1  BNI     =31B,=17B,SSTIQ
+       SBRM    GNM1
+       CAB
+       LDA     N
+       SUB     =1
+       BLE     =-1,SSTIQ
+       STA     SSKX
+       CBA
+       BRU     SSTI4
+SSTIQ  TYPE    37B
+       TYPE    0B
+       BRU     SSTI3
+*SUBSTITUTE OPTIONS TABLE
+OPTB   CLA
+       CLB
+       DATA    47B
+       LDA     =-1
+       CLB
+       DATA    54B
+       CLA
+       LDB     =-1
+       DATA    67B
+       LDA     =-1
+       LDB     =-1
+       DATA    66B
+OPTE   DATA    -1
+* DELETE BLOCK
+DEL    ZRO     DELZ
+       SKG     =-1
+       LDA     =1
+       STA     NIR
+       SBRM    IVL
+DLL    LDX     VE
+       LDA     =2
+       ADM     VE
+       LDA     VE,2
+       XMA     P1
+       XMA     VE1,2
+       STA     VE,2
+       CXA
+       ADD     =VE
+       LDB     =P1
+       SBRM    CPY
+       SBRM    CLN
+       STA     LCT
+       LDA     VE
+       BEQ     =0,DEO
+       LDA     SN
+       ADD     =2
+       SBRM    FSS
+       BRU     DLL
+DEO    SBRM    STE
+       LDA     A
+       SUB     =1
+       SKG     =0
+       CLA
+       SBRM    FND
+       SBRR    DEL
+* GET OUTPUT FILE
+SNFM   DATA    13B6
+GOF    ZRO     GFIX
+       CLB
+       STB     W
+       LDA     AFN1
+       LCY     12
+       MRG     AFN
+       IF      -BBN
+       CAX
+       LDA     GB3
+       STA     TCRP
+       STA     TCRP1
+       LDB     =TCRP
+       LDA     =23B6
+       BRS     16
+       ELSF    BBN
+       BRS     18
+       ENDF
+       BRU     CE
+       XAB
+       BNE     =16B,CE
+       IF      -BBN
+       COPY    XB,A
+       SKB     =2B7
+       BRU     GOT
+       ELSF    BBN
+       STB     FINDEX
+       ENDF
+       LDX     VX
+GOL    ADD     VE1,2
+       SUB     VE,2
+       EAX     1,2
+       BRX     GOL
+       STA     W
+GOC    GCVB    GOT
+       BLE     =154B,GVC
+       SKG     =155B
+       BRU     GOR
+       BLE     =201B,GOK
+GOR    MIN     W
+       BRU     GVC
+GOK    BNE     =200B,GVC
+       SKR     W
+       BRU     GVC
+GOT    CLA
+       XMA     W
+       ADD     =3
+       CCW
+       IF      -BBN
+       LDB     =TCRP
+       LDX     =-1
+       MRG     SNFM
+       BRS     16
+       ELSF    BBN
+       CAB
+       LDA     FINDEX
+       LDX     =3
+       BRS     19
+       ENDF
+       BRU     CE
+       STA     WRF
+GFS    SBRM    CRLF
+       SBRR    GOF
+* DELETE BUFFER
+BDL    ZRO     LN
+       STX     NIR
+       STX     FN
+       LDA     QQ1
+       SKE     Q1,2
+       ELSE    (STA QQ)
+       EAX     Q,2
+       BRM     RJ
+       LDX     FN
+       LDA     Q,2
+       SUB     Q1,2
+       STA     PX
+       LDA     Q1,2
+       LDB     R1
+       STP     V
+       MVA     (Q,2),(Q1,2)
+       STA     R1
+       LDX     QL
+BDJ    LDA     QL,2
+       BLE     R1,BDB
+       LDA     PX
+       ADM     QL,2
+BDB    BRX     BDJ
+BDC    GCI     V
+       SBRR    BDL
+       WCI     R
+       BRU     BDC
+* FIND LAST LINE
+LLF    ZRO     GSTX
+       LDA     ZE
+       SBRM    CNBL
+       SUB     =1
+       SBRR    LLF
+*COMPARE GET NEXT BLOCK.  CALLED FROM SUCCESSFUL COMPARE IN ASC
+*WHEN A BLOCK IS EXHAUSTED.
+CGNB   ZRO     CGNBZ
+CGN1   LDA     SN
+       ADD     =2
+       BEQ     ZE,ACF
+       SBRM    FSS
+       LDA     P1
+       BLE     BUF3,CGN1
+       CCW
+       ADD     =1
+       STA     TA
+       LDA     =BUF
+       SUB     TA
+       XMA     TA
+       MRG     =20000000B
+       XMA     TA
+       CAX
+       BRR     CGNBZ
+* ARBITRARY TEXT SEARCH. THERE ARE TWO ENTRIES, ATSI AND ATS. THE
+* FIRST IS FOR INITIALIZATION, THE SECOND TO CONTINUE A SEARCH.
+ABSS   ZRO     ATSZ
+       MVA     =-1,EUX
+       BRU     AST
+ATSI   ZRO     ATSZ
+ASB    SBRM    SRB
+       MVA     CUR,ACURX
+       MVA     SN,ASNX
+       MVA     CRP,ACRX
+       STA     EUX
+AST    MVA     =-1,APBX
+       STA     ATBX
+       STA     ACYX
+       STA     LS
+       MVP     S,SRP
+       GC      SRP,CE
+       SKR     SRP
+       BLE     =200B,TSC
+       MIN     SRP
+       STA     APBX
+TSC    GCD     SRP
+       BRU     AMB
+       MIN     SRP1
+       BLE     =200B,TSB
+       STA     ATBX
+       SKR     SRP1
+TSB    CLX
+TSL    STX     AXX
+       LDA     AT,2
+       CWC
+       ADD     AXX
+       STA     V
+       STA     V1
+       MVP     SRP,BMP
+TST    LDA     V
+       SUB     V1
+       BLE     =-25,TSD
+TSM    GC      BMP,TSD
+       BEQ     =200B,TSM
+       WCI     V
+       BNCR    TST
+       RJS     V
+       BRU     TST
+TSD    LDA     AXX
+       CLB
+       LSH     1
+       CAX
+       MVP     BMP,(ATLOP,2)
+TSN    LDA     V1
+       SUB     V
+       ADD     AXX
+       CCW
+       AXC
+       LSH     2
+       SKE     =0
+       EAX     1,2
+       SKG     =0
+       LDA     =3
+       COPY    XB,AX
+       LDX     ALMT,2
+       XMA     AXX
+       XXA
+       STA     ALM,2
+       LDA     AXX
+       STA     ATCX,2
+       STX     AXX
+       CBA
+       SUB     =1
+       STA     ATNDX,2
+       BNE     =0,TSK
+       LDA     ALM,2
+       BRU     TSJ
+TSK    LDA     =-1
+TSJ    ETR     AFMT,2
+       STA     AFM,2
+       LDA     AXX
+       ADD     =1
+       CAX
+       BNE     =3,TSL
+ATB    MVA     CRP,V
+       IFP     EUX,(BRU ASO)
+       BRU     AIC
+ATS    ZRO     ATSZ
+AIC    STA     V
+       LDA     SN
+       BNE     ASNX,ASO
+       LDA     ACRX
+       SKG     V
+       BRU     AID
+       STA     ACYX
+       STA     V1
+       BRU     ASP
+AID    SKE     V
+       SKN     ACYX
+       BRU     ATF
+       BRU     ASP
+ASO    MVA     P1,V1
+ASP    LDA     V1
+       CCW
+       ADD     =1
+       STA     TA
+       LDA     V
+       ADD     =1
+       CCW
+       AXC
+       LSH     2
+       XXA
+       SUB     TA
+       XMA     TA
+       MRG     =20000000B
+       XMA     TA
+       COPY    AX,XB
+       LDA*    TA
+       XXB
+       ETR     AFMT,2
+       CBX
+       BRU     ACL+1
+ACL    LDA*    TA
+       LDB     AFM
+       SKM     ACT
+       BRU     AC1
+       CLB
+       BRU     ACS
+AC1    LDB     AFM1
+       SKM     ACT1
+       BRU     AC2
+       LDB     =1
+       BRU     ACS
+AC2    LDB     AFM2
+       SKM     ACT2
+       BRX     ACL
+       SKM     ACT2
+       BRU     ACNB
+       LDB     =2
+ACS    STX     PHX
+       STB     AXX
+       STA     ACCX
+       MVA     TA,ABTAX
+       MVA     SN,ABSNX
+       CBX
+       LDA     AT,2
+       ADD     ATNDX,2
+       MRG     =20000000B
+       STA     TA1
+       LDA     TA
+       ETR     =37777B
+       ADD     PHX
+       STA     TA
+       LDA     P1
+       CCW
+       ADD     =1
+       XMA     TA
+       SUB     TA
+       STA     THX
+       LDA     TA
+       MRG     =20000000B
+       STA     TA
+       LDX     AXX
+       LDA     ATNDX,2
+       BLE     =0,ASC
+       BLE     =1,ALW
+       CNA
+       ADD     =1
+       STA     THX1
+       LDX     THX
+       BRX     ACU
+       SBRM    CGNB
+ACU    LDA*    TA
+       STX     THX
+       LDX     THX1
+       SKE*    TA1
+       BRU     ACF
+       BRX     *+2
+       BRU     ALW
+       STX     THX1
+       LDX     THX
+       BRX     ACU
+       SBRM    CGNB
+       BRU     ACU
+ALW    LDX     THX
+       BRX     *+2
+       SBRM    CGNB
+       LDA*    TA
+       STX     THX
+       LDX     AXX
+       LDB     ALM,2
+       CLX
+       SKM*    TA1
+       BRU     ACF
+ASC    LDA     TA
+       ETR     =37777B
+       ADD     THX
+       CWC
+       LDX     AXX
+       ADD     ATCX,2
+       STA     V
+       MVA     P1,V1
+       LDA     AXX
+       CLB
+       LSH     1
+       CAX
+       MVP     (ATLOP,2),BMP
+ASL    GC      BMP,ABC
+       BEQ     =200B,ASL
+       STA     ACX
+ASM    LDX     =ASM
+       GC      V,APNB
+       BEQ     =200B,ASM
+       BNE     ACX,ACF
+       BRU     ASL
+APNB   STX     THX
+       SBRM    CGNB
+       MVA     BUF3,V
+       MVA     P1,V1
+       BRU*    THX
+ABC    SKN     ATBX
+       ELSE    (BRU ABCP)
+ABD    LDX     =ABD
+       GC      V,APNB
+       SUB     ATBX
+       BLE     =-1,ACF
+ABCP   SKN     APBX
+       ELSE    (BRU AAS)
+       LDA     ABSNX
+       SBRM    FSS
+       LDA     ABTAX
+       ETR     =37777B
+       ADD     PHX
+       CWC
+       ADD     AXX
+ABCL   STA     P
+       IFP     LS,(MIN P)
+       MVA     BUF3,P0
+       GCD     P0
+       BRU     ABCNB
+       SUB     APBX
+       BLE     =-1,ACF
+       BRU     AAS
+ABCNB  LDA     SN
+       BLE     =0,ACF
+       SUB     =2
+       SBRM    FSS
+       LDA     P1
+       BRU     ABCL
+AAS    LDA     ABSNX
+       SBRM    FSS
+       LDA     ABTAX
+       ETR     =37777B
+       ADD     PHX
+       STA     TA
+       CWC
+       ADD     AXX
+       STA     SRP
+       SKN     APBX
+       SKN     LS
+       ELSE    (SKR SRP)
+       LDB     TA
+       LDA     =BUF
+       SBRM    CCR
+       ADD     NBL
+       SBRM    FND
+       BRR     ATSZ
+ACF    LDA     ABSNX
+       SBRM    FSS
+       MVA     ABTAX,TA
+       LDX     PHX
+       LDA     ACCX
+       SKR     AXX
+       ELSE    (BRU AC1)
+       SKR     AXX
+       ELSE    (BRU AC2)
+       BRX     ACL
+ACNB   IFP     ACYX,(BRU ATF)
+       LDA     SN
+       ADD     =2
+       SKE     ZE
+       ELSE    CLA
+       SBRM    FSS
+       LDA     BUF3
+       BRU     AIC
+AMB    LDA     =40100200B
+       STA*    AT
+       STA*    AT1
+       STA*    AT2
+       MVA     =40000000B,AFM
+       LRSH    8
+       STA     AFM1
+       LRSH    8
+       STA     AFM2
+       STZ     ATNDX
+       STA     ATNDX1
+       STA     ATNDX2
+       LDX     =-6
+       LDA     ATLOP
+       STA     ATLOPE,2
+       BRX     *-1
+       STZ     LS
+       BRU     ATB
+ATF    LDA     ACURX
+       SBRM    FND
+       MIN     ATSZ
+       BRR     ATSZ
+* LABEL SEARCH
+LD     ZRO     LDZ
+       STB     TA
+       SUB     TA
+       STA     THX
+       CBA
+       MRG     =20000000B
+       STA     TA
+       LDA     S1
+       BLE     S,CE
+       CCW
+       ADD     =1
+       MRG     =20000000B
+       STA     TA1
+LDR    LDA     S1
+       SUB     S
+       SUB     =1
+       CCW
+       ADD     =1
+       CNA
+       STA     LMX
+       CLA
+       LSH     2
+       CAX
+       LDA     PMSK,2
+       STA     SRC
+       LDX     LMX
+LDL    LDA     =-1
+       STA     MSKT,2
+       LDA*    TA1
+       STA     SRCT,2
+       BRX     LDL
+LDT    LDX     =-1
+       LDA     SRC
+       STA     MSKT,2
+       LDA     TA
+       ADD     LDMI
+       STA     LDM
+       SUB     LDMJ
+       STA     TA2
+       LDX     LMX
+       MVA     (MSKT,2),MSK
+       CAB
+       MVA     (SRCT,2),SRC
+       LDX     THX
+       BRU     LDM
+LDMI   SKM     0
+LDMJ   SKM     1
+LDNL   BRX     LDM
+       BRU     LDNR
+LDNR   SKM*    TA
+       BRU     LDF
+       LDA*    TA2
+       ETR     =377B
+       BNE     =200B,LDC
+LDE    STX     PHX
+       STX     THX
+       MVA     LMX,LTX
+LDD    LDX     LTX
+       BRX     *+2
+       BRU     LDS
+       STX     LTX
+       LDB     MSKT,2
+       LDA     SRCT,2
+       LDX     THX
+       BRX     *+2
+       BRU     LDF
+       STX     THX
+       SKM*    TA
+       BRU     LCF
+       BRU     LDD
+LDC    BEQ     =155B,LDE
+LDU    LDA     SRC
+       BRU     LDN
+LCF    LDB     MSK
+       LDA     SRC
+       LDX     PHX
+       BRU     LDN
+LDF    BRR     LDZ
+LDS    LDA     TA
+       ETR     =37777B
+       ADD     PHX
+       STA     THX
+       CWC
+       ADD     S1
+       SUB     S
+       STA     P
+       GC      P,CE
+       BNI     =72B,=17B,LDO
+       BNI     =40B,=31B,LCF
+LDO    LDA     THX
+       CAB
+       LDA     =BUF
+       SBRM    CCR
+       ADD     NBL
+       SBRM    FND
+       MIN     LDZ
+       BRR     LDZ
+*COUNT CR'S. A: 1ST WORD OF INTERVAL, B: LAST WORD+1, X:---
+*RETURNS COUNT IN A.
+CCR    ZRO     CCRZ
+       STB     TA
+       SUB     TA
+       BLE     =-1,CCM
+       CLA
+       BRR     CCRZ
+CCM    CAX
+       CBA
+       MRG     =20000000B
+       STA     TA
+       LDB     =377B
+       STZ     CNT
+CCL    LDA*    TA
+       SKM     =200B
+       BRU     CCS
+CCN    MIN     CNT
+       BRX     CCL
+CCO    LDA     CNT
+       BRR     CCRZ
+CCS    SKM     =155B
+       BRX     CCL
+       SKM     =155B
+       BRU     CCO
+       BRU     CCN
+*WINDOW ROUTINES
+*GET A CHARACTER FROM THE INTERVAL SET UP BY IVL
+GVC    DB      GPX,GVP
+       DB      GWX,GVW
+       LDA     GBX
+       LRSH    16
+       STB     GBX
+       BRR     GVV
+GVW    MVA     =40000002B,GWX
+       MIN     GWA
+       LDA*    GWA
+       LRSH    16
+       STB     GBX
+       BRR     GVV
+GVP    LDA     VX
+       ADD     =2
+       BNE     =0,GVQ
+       MIN     GVV
+       BRR     GVV
+GVQ    STA     VX
+       STX     GVX
+       LDA     SN
+       ADD     =2
+       SBRM    FSS
+       SBRM    SGV
+       LDX     GVX
+       BRU     GVC
+*SET UP THE FIRST (NEXT) POINTER FOR USE BY GVV
+SGV    ZRO     SGVX
+       LDX     VX
+       LDA     VE1,2
+       SUB     VE,2
+       MRG     =40000000B
+       STA     GPX
+       ETR     =37777777B
+       SKG     =0
+       SBRR     SGV
+SGP    LDA     VE,2
+       ADD     =1
+       LRSH    23
+       DIV     =3
+       STA     GWA
+       CBA
+       COPY    AX,N
+       ADD     =3
+       MRG     =40000000B
+       STA     GWX
+       LDA*    GWA
+       EXU     CYT,2
+       STB     GBX
+       SBRR    SGV
+*OPEN A LOCATION IN THE TABLE 'Z'
+IEZ    ZRO     IEZX
+       ADD     =Z
+       CAB
+       ADD     =2
+       XAB
+       LDX     ZE
+       EAX     Z,2
+       SBRM    MOVER
+       LDA     =2
+       ADM     ZE
+       BRR     IEZX
+*CREATE NEW SEGMENT
+CRS    ZRO     CRSX
+       IFP     SN,(SBRM STC)
+       LDB     =155B
+       STB     BUF0
+       STA     NIR
+       STA     SN
+       SBRM    IEZ
+       BRS     43
+       BAC
+       ETR     =77000000B
+       LDX     SN
+       STP     Z,2
+       STB     LCT
+       MVA     BUF3,P1
+       LDA     SN
+       SBRM    CNBL
+       STA     NBL
+CRSO   LDA     ROCN
+       SKG     =-1
+       STA     NIR
+       IFP     ROCN,(BRU PPOUT)
+       SBRR    CRS
+*STORE CURRENT SEGMENT
+STC    ZRO     STCX
+       STA     SAX
+       LDA     ZE
+       BLE     =0,STO
+       LDA     =-1
+       BRU     STEC
+STE    ZRO     STCX
+       CLA
+STEC   STA     STMX
+       SBRM    CLN
+       STA     LCT
+       BRS     43
+       CBA
+       ETR     =77000000B
+       ADD     P1
+       SUB     BUF3
+       LDB     LCT
+       LDX     SN
+       STP     Z,2
+       IFP     STMX,(BRR STCX)
+STCC   MVA     =-1,SN
+       BRS     43
+       XAB
+       ETR     =777777B
+       XAB
+       BRS     44
+STO    LDA     SAX
+       SBRR    STC
+*COMPUTE NBL FOR THE SPECIFIED SEGMENT
+CNBL   ZRO     CBLX
+       COPY    AB,N
+       COPY    AX,BA
+       BLE     =0,CBO
+       ADD     =Z
+       ADD     =20000001B
+       STA     TA
+       CLA
+CBL    ADD*    TA
+       EAX     1,2
+       BRX     CBL
+CBO    STA     CNT
+       ADD     =1
+       SBRR    CNBL
+*DESTROY SPECIFIED SEGMENT
+DSS    ZRO     CRSX
+       STA     NIR
+       STA     DSX
+       IFP     SN,(SBRM STC)
+       CAX
+       LDA     Z,2
+       LRSH    18
+       BRS     121
+DSC    LDA     DSX
+       ADD     =2
+       SUB     ZE
+       SKG     =-1
+       ELSE    (BRU DSO)
+       CAX
+       LDA     ZE
+       ADD     =Z
+       MRG     =20000000B
+       STA     TA
+DSL    LDP*    TA
+       EAX     -2,2
+       STP*    TA
+       EAX     3,2
+       BRX     DSL
+DSO    LDA     =-2
+       ADM     ZE
+       BRU     CRSO
+*FIND SPECIFIED SEGMENT
+FSS    ZRO     CRSX
+       CAB
+       LDA     ZE
+       BLE     =0,CE
+       CBA
+       BEQ     SN,FSO
+       IFP     SN,(SBRM STC)
+       STA     NIR
+       STA     SN
+       CAX
+FSG    LDA     Z,2
+       ETR     =77000000B
+       STA     TA
+       BRS     43
+       XAB
+       ETR     =00777777B
+       MRG     TA
+       XAB
+       BRS     44
+       LDA     Z,2
+       ETR     =00777777B
+       ADD     BUF3
+       STA     P1
+       MVA     (Z1,2),LCT
+       LDA     SN
+       SBRM    CNBL
+       STA     NBL
+FSO    BRU     CRSO
+*COUNT LINES IN BLOCK 4
+CLN    ZRO     CLNX
+       LDA     P1
+       CCW
+       ADD     =1
+       CAB
+       LDA     =BUF
+       SBRM    CCR
+       SBRR    CLN
+*BLOCK MOVE. A:SOURCE, B:DEST., X:SOURCE+1
+MOVER  ZRO     MOVEZ
+       STX     MOVE1
+       STB     MOVE2
+       SKG     MOVE2
+       BRU     MOVER1
+       SUB     MOVE1
+       COPY    AX,N
+       SKG     =0
+       SBRR    MOVER
+       ADM     MOVE2
+       LDA     MOVEC1
+       ADM     MOVE1
+       LDA     MOVEC2
+       ADM     MOVE2
+       LDP     MOVEC4
+       STP     MOVE3
+       BRU     MOVE1
+MOVEC1 LDA     0,2
+MOVEC2 STA     0,2
+MOVEC3 EAX     -2,2
+MOVEC4 BRX     MOVE1
+       SBRR    MOVER
+MOVER1 SKE     MOVE2
+       ELSE    (SBRR MOVER)
+       XMA     MOVE1
+       SUB     MOVE1
+       SKG     =0
+       SBRR    MOVER
+       ADD     =40000B
+       CAX
+       LDA     MOVE1A
+       ADM     MOVE1
+       LDA     MOVE2A
+       ADM     MOVE2
+       LDA     MOVEC3
+       STA     MOVE3
+       LDP     MOVEC4
+       STP     MOVE4
+       BRU     MOVE1
+MOVE1A DATA    27600000B-1
+MOVE2A DATA    23500000B-1
+* FAST STRING MOVE
+* CALL OF MOVEP
+* A: ADDRESS OF SOURCE POINTER
+* B: ADDRESS OF DESTINATION POINTER
+* CALL OF COPY IS SET UP WITH MACRO COPYST (Q.V.)
+CPY    ZRO     CRSX
+       STA     NIR
+       STB     CPYB
+       CAX
+       LDA     1,2
+       SUB     0,2
+       STA     CPYL
+       LDA     1,2
+       ADD     =2
+       LDB     0,2
+       LDX*    CPYB
+       COPY    XB,AX,BA
+       SBRM    MOVEP
+       LDA     CPYL
+       ADM*    CPYB
+       BRU     CRSO
+*CALL OF MOVER WITH STRING POINTER PARS IN A,B,X
+MOVEP  ZRO     MOVEZ
+       STP     MTP
+       CXA
+       ADD     =1
+       CCW
+       XMA     MTP1
+       ADD     =1
+       CCW
+       XMA     MTP
+       ADD     =1
+       CCW
+       LDB     MTP
+       LDX     MTP1
+       BRU     MOVER+1
+
+PN     MACRO   A
+       BRU     A(2)
+       DATA    A(1)
+       ENDM
+CTB    PN      0,PLS
+       PN      155B,CA
+       PN      15B,MNS
+       PN      13B,PLS
+       PN      16B,DOT
+       PN      152B,NXL
+       PN      76B,PVL
+       PN      14B,CMA
+       PN      32B,LSR
+       PN      35B,EQ
+       PN      73B,SB
+       PN      37B,CR
+       PN      17B,PNI
+       PN      4B,LL
+       PN      77B,PSY
+       PN      2,DQ
+       PN      40B,ALL
+       EAX     CPQ
+       ASC     '  QUICK/'
+       EAX     CPV
+       ASC     '  VERBOSE/'
+       EAX     PNP
+       ASC     '  PRINT/'
+       LDX     =RD
+       DATA    40000062B
+       ASC     'EAD FROM /'
+       LDX     =KIL
+       ASC     '  KILL /'
+       EAX     DL
+       ASC     '  DELETE/'
+       EAX     CHN
+       ASC     '  CHANGE/'
+       EAX     INS
+       ASC     '  INSERT/'
+       LDX     =WR
+       DATA    40000067B
+       ASC     'RITE ON /'
+       EAX     APD
+       ASC     '  APPEND/'
+       LDX     =BLG
+       ASC     '  GET /'
+       EAX     ED
+       ASC     '  EDIT/'
+       EAX     EDM
+       ASC     '  MODIFY/'
+       LDX     =BL
+       ASC     '  LOAD /'
+       LDX     =BT
+       ASC     '  BUFFER /'
+       EAX     TBS
+       ASC     '  TABS/'
+       LDX     =SS
+       ASC     '  SUBSTITUTE /'
+       LDX     =JMI
+       ASC     '  JAM INTO /'
+       EAX     FIN
+       ASC     '  FINISHED/'
+ECTB   PN      -1,CE
+CCT    ZRO     GCA
+       BRU     GSX
+       BRU     GCC
+       BRU     GCD
+       BRU     GCE
+       BRU     GCF
+       BRU     GSX
+       BRU     GCH
+       BRU     GSX
+       BRU     GSX
+       BRU     GCK
+       BRU     GCL
+       ZRO     GCM
+       BRU     GCN
+       BRU     GCO
+       BRU     GCP
+       ZRO     GCQ
+       BRU     GCR
+       BRU     GCS
+       BRU     GCT
+       BRU     GCU
+       ZRO     GCV
+       ZRO     GCW
+       BRU     GCX
+       BRU     GCY
+       BRU     GCZ
+QRM    ASC     '? /'
+MPM    ASC     'NO ROOM./'
+IOPM   ASC     'I-O ERROR./'
+NFM    ASC     'NEARLY FULL./'
+B1M    DATA    00610400B       (#1 )
+       ASC     'FULL./'
+ETM    ASC     'EDIT TERMINATED./'
+BFM    ASC     '(FULL)/'
+WFM    ASC     %WON'T FIT.$/%
+SYM    ASC     'ES/'
+SIM    ASC     ' FOR /'
+WOM    ASC     'WRITE OUT'
+       DATA    00207400B       (!/ )
+WWM    ASC     ' WORDS.$/'
+QDM    ASC     'DOUBLE? /'
+NPM    DATA    32465152B,32465152B     (6 LF'S)
+       DATA    03206415B,03206404B     (-----$)
+       DATA    32465152B,32465017B     (5 LF'S /)
+*CYCLE TABLE FOR GCF
+FCYT   RCY     16
+       RCY     8
+       BRM     NXW
+CYT    CAB
+       LRSH    16
+       LRSH    8
+ALMT   DATA    -1
+PMSK   DATA    77600000B,77777400B
+AFMT   DATA    -1,177777B,377B
+CHRT   EQU     AFMT
+TSI    DATA    8,16,32,40
+NTAB   EQU     12
+BUF    EQU     20001B
+BUF0   EQU     BUF-1
+GB     EQU     1300B
+GB1    EQU     GB+764B
+ABF    EQU     GB1+240B
+EBF    EQU     27760B
+RB     EQU     24000B
+H      EQU     11000B
+M      EQU     10000B
+L      EQU     7000B
+LLEN   EQU     30
+       SPTR    GB
+       SPTR    GB1
+       SPTR    BUF
+       SPTR    BUF0
+       END
