@@ -21,15 +21,15 @@ The directories are listed here in approximate chronological order
 of the QED version for which they apply. Each directory has its
 own `README.md` file.
 
-* `sds-940`: QED for the XXX 930 and 940 systems in the late 1960s.
+* `sds-940`: QED for the SDS 930 and 940 systems in the late 1960s.
 
-* `multics`: What seems to be the last version of QED for MULTICS, 19xx.
+* `multics`: What seems to be the last version of QED for MULTICS.
 
 * `usenix-80-caltech`: QED scripts from a 1980 USENIX software
 distribution tape.
-P
+
 * `unix-1985`: My tarball from 1987. The files therein have dates
-in XXXX 1985.
+in April 1985.
 
 * `unix-1992`: A tarball supplied to me by Rob Pike, one of the original
 authors of QED for Unix when at the University of Toronto. The files
@@ -44,7 +44,7 @@ There are other relevant GitHub archives of QED. Since they're already
 on GitHub, I saw no reason to replicate them here.
 
 * The code for [CTSS QED](https://github.com/rcornwell/ctss/tree/master/src/edit). 
-Pointer provided by XXXX.
+Pointer provided by Lars Brinkhoff.
 
 * Leah Neukirchen's
 [up-to-date port of QED](https://github.com/chneukirchen/qed-caltech).
@@ -57,4 +57,4 @@ files I received, even though they actually predate Git's invention.
 
 #### Last Updated
 
-Wed Dec 26 18:31:47 IST 2018
+Tue Jan  8 19:10:29 IST 2019
