@@ -49,8 +49,8 @@ Pointer provided by Lars Brinkhoff.
 * Leah Neukirchen's
 [up-to-date port of QED](https://github.com/chneukirchen/qed-caltech).
 
-* Phonologous (Sean J.)'s [port of Rob Pike's 1992 Unix version, updated
-to support UTF-8/Unicode](https://github.com/phonologus/QED).
+* Sean Jesen's [port of Rob Pike's 1992 Unix version, updated to support
+UTF-8/Unicode](https://github.com/phonologus/QED).
 
 ## Other Notes
 
@@ -60,4 +60,4 @@ files I received, even though they actually predate Git's invention.
 
 #### Last Updated
 
-Sun May 17 13:13:31 IDT 2020
+Sun May 17 15:22:10 IDT 2020
