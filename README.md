@@ -61,7 +61,7 @@ files I received, even though they actually predate Git's invention.
 ## Links of Possible Interest
 
 Leah Neukirchen's blog ["Remembering The Work of David Tilbrook and the
-QED Editor](https://leahneukirchen.org/blog/archive/2021/01/remembering-the-work-of-david-m-tilbrook-and-the-qed-editor.html).
+QED Editor"](https://leahneukirchen.org/blog/archive/2021/01/remembering-the-work-of-david-m-tilbrook-and-the-qed-editor.html).
 
 #### Last Updated
 
