@@ -58,6 +58,11 @@ I have attempted to use various Git incantations to make the files
 appear to have the commit dates as recorded in the tarballs and zip
 files I received, even though they actually predate Git's invention.
 
+## Links of Possible Interest
+
+Leah Neukirchen's blog ["Remembering The Work of David Tilbrook and the
+QED Editor](https://leahneukirchen.org/blog/archive/2021/01/remembering-the-work-of-david-m-tilbrook-and-the-qed-editor.html).
+
 #### Last Updated
 
-Sun May 17 15:22:10 IDT 2020
+Mon Feb  1 07:45:07 IST 2021

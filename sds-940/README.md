@@ -3,7 +3,16 @@
 ## Introduction
 
 These files were supplied to me by Lars Brinkhoff (lars AT nocrew.org).
-I have no idea where he got them.
+
+Some if not all of the files originally came from Bitsavers.org; they were
+recovered by Al Kossow (aek AT bitsavers.org).
+
+In January of 2020, Lars writes:
+
+> I got everything packaged in a zip file from Mark Emmer.  One of the
+> PDF files is identical the Bitsavers file, the other is not identical:
+> http://bitsavers.org/pdf/sds/9xx/940/901112B_940_QED_RefMan_Jan69.pdf
+> http://bitsavers.org/pdf/sds/9xx/940/ucbProjectGenie/mcjones/R-15_QED.pdf
 
 ## Contents
 
@@ -15,4 +24,4 @@ from 1969, describing QED.
 
 #### Last Updated
 
-Sun Dec 23 19:03:51 IST 2018
+Mon Feb  1 07:47:42 IST 2021
