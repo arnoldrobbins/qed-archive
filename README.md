@@ -49,8 +49,7 @@ Pointer provided by Lars Brinkhoff.
 * Leah Neukirchen's
 [up-to-date port of QED](https://github.com/chneukirchen/qed-caltech).
 
-* Sean Jesen's [port of Rob Pike's 1992 Unix version, updated to support
-UTF-8/Unicode](https://github.com/phonologus/QED).
+* Sean Jensen's [new port of Rob Pike's 1992 Unix version, with UTF-8 support](https://github.com/phonologus/qed-new).
 
 ## Other Notes
 
@@ -62,6 +61,8 @@ files I received, even though they actually predate Git's invention.
 
 Leah Neukirchen's blog ["Remembering The Work of David Tilbrook and the
 QED Editor"](https://leahneukirchen.org/blog/archive/2021/01/remembering-the-work-of-david-m-tilbrook-and-the-qed-editor.html).
+
+Sean Jensen's updated version of Rob Pike's [QED Tutorial](https://github.com/phonologus/qed-book).
 
 #### Last Updated
 
