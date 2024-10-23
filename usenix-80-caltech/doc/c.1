@@ -1,0 +1,37 @@
+.th C I Jan/80
+.sh NAME
+c \*- columnate
+.sh SYNOPSIS
+.bd c
+[-]
+[-n]
+[-wN]
+[file1 ...]
+.sh DESCRIPTION
+.bd C
+reads from the standard input (or the named files)
+and writes to the standard output splitting as many lines as possible
+per line. "-n" sets the line width
+(default 80).
+If an input line ends in a colon `:', a `break' occurs; thus
+`ls directory1 directory2 | c' causes the listings of directories
+to be columnated separately.  This feature is suppressed if the
+"-" option is present, or if the input is from a file.
+The "-wN" option sets the maximum number of words required
+to columnate; the default is 2048.
+A message is printed if space runs out.
+.sh EXAMPLES
+ls | c
+.br
+nm /net/caltech/unix | c -130 | pr -h "Cal conf" | lpr
+.sh DIAGNOSTICS
+"c: out of words": run again, with a larger words space size.
+.br
+"c: out of memory": tough luck.
+.br
+"c: no word space": things are deeply disturbed.
+.br
+If a file cannot be read, a message is printed but processing continues.
+.br
+.sh "U of T INFO"
+Written by Rob Pike, inspired by a U. Waterloo version.

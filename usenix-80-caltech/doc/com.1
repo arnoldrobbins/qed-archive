@@ -1,0 +1,48 @@
+.th COM I April/79
+.sh NAME
+com \*- compile programs in a flexible manner
+.sh SYNOPSIS
+com file ...
+.sh DESCRIPTION
+For each file name given on the command line, com
+searches the file for a line containing the character string `/*%'.
+The rest of the line is taken to be a command.
+After printing the command on its standard output, com sends the line to
+the shell for execution.
+Any occurrence of the `%' character in the command has the file's name
+substituted for it before it is sent to the shell.
+For example, if a file named hoodoo.c contains the text
+.br
+	/*% cc -f -O % -lgw -ln;mv a.out hoodoo
+.br
+	 */
+.br
+at the beginning, then typing `com hoodoo.c' will cause the
+program to be compiled using the (presumably) correct flags and libraries.
+	Note that although the `/*%' escape sequence makes it particularly
+convenient for C programs, com is useable from any other language that
+has a reasonable comment convention by putting the `/*%' sequence inside
+a comment.
+For example in a Fortran (Grid forbid) program, one might include the line
+
+c	/*% fc -n horrors.f gruesome.o atrocities.o
+.sh FILES
+/bin/sh -- the shell, called to execute commands.
+.sh "SEE ALSO"
+make(I)
+.sh DIAGNOSTICS
+Try again later -- can't fork to execute the shell.
+.br
+No shell! -- can't execute the shell.
+.br
+filename: no command -- the sequence `/*%' was not found in the file.
+.sh AUTHOR
+Tom Duff
+.sh BUGS
+It doesn't know about quoted strings, so, for example the line
+	printf("/*%s*/\\n", comment);
+.br
+will cause it to try to execute the string `s*/\\n", comment);'.
+This is mitigated by the fact that it only searches for the first
+occurrence of `/*%', so if you put the command line at the front of
+the file, everything should be ok.

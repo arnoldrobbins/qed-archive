@@ -1,0 +1,61 @@
+.th SHEXECV III "27 November 1977"
+.sh NAME
+shexecv, shexecl \*- execute a command the way the Shell does
+.sh SYNOPSIS
+.bd "shexecv(command, arglist)"
+.br
+.bd "char *command;"
+.br
+.bd "char *arglist[];"
+.s3
+.bd "shexecl(command, arg0, arg1, ..., argn, 0)"
+.br
+.bd "char *command, *arg0, *arg1, ..., *argn;"
+.sh DESCRIPTION
+.it Shexecv
+and
+.it shexecl
+are analogous to
+.it execv
+and
+.it execl;
+but instead of being passed
+the name of a file to be executed
+they are given the name of a command.
+The usual search strategy of the Shell
+is used to locate the command:
+.it shexecv
+and
+.it shexecl
+look in
+the current directory,
+the directory `bin' within the user's own home directory,
+`/bin',
+and `/usr/bin', respectively.
+If this fails an attempt is made to execute the command name
+as a command file in the current directory.
+(This standard search sequence can be modified
+in the usual way with a `.vars' file;
+this is described in \fIsh\fR(I)).
+.s3
+There is normally no return from
+.it shexecv
+and
+.it shexecl.
+.sh FILES
+/etc/passwd
+.br
+/usr/user/bin/*
+.br
+/usr/user/.vars
+.sh "SEE ALSO"
+exec (II), sh (I)
+.sh DIAGNOSTICS
+A return of -1 is made if the command cannot be executed.
+.sh "U OF T INFO"
+Written at the University of Toronto by Ron Gomes.
+.sh BUGS
+Not dazzlingly fast.
+.br
+Depends on the peculiar Shell used at U of T,
+but can be set up to run anywhere.

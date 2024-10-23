@@ -1,0 +1,1734 @@
+.th "QED" I Jan/80
+.if t .ds q \(aa
+.if n .ds q '
+.sh NAME
+qed \*- multi-file text editor
+.sh SYNOPSIS
+.bd qed
+[
+.bd \*-
+] [
+.bd -i
+] [
+.bd -q
+] [
+.bd -x
+startupfile
+] [ file1 file2 ... ]
+.sh DESCRIPTION
+\fIQed\fP
+is a multiple-file text editor,
+much like \fIEd\fP,
+but with a number of enhancements and a few incompatibilities.
+.s3
+.it Qed
+operates on a copy of any file it is editing; changes made
+in the copy have no effect on the file until a \fIw\fR (write)
+or a \fIW\fR (WRITE)
+command is given.
+The copy of the text being edited resides
+in a scratch area called a
+\fIbuffer\fP.
+There are 56 buffers, labeled by alphabetics `a' to `z' and `A' to `Z',
+and the characters `{', `|', `}' and `~'
+(the four ASCII characters following `z').
+These 56 characters are called, for notational efficiency,
+.it bnames.
+The buffers can contain any ASCII character except NUL.
+.s3
+If
+.it file
+arguments are given,
+.it qed
+simulates an
+.it e
+command (see below) on each of the named files; that is to say,
+the files are read into
+.it qed's
+buffers so that they can be edited.
+The first is read into buffer `a', the second into buffer `b',
+through `z',
+then from `A' to `Z',
+up to a maximum of 52 files.
+The optional
+.bd \*-
+puts
+.it qed
+in non-\c
+.it verbose
+mode (described with the
+.it o
+command).
+Quit signals are ignored unless the
+.bd \*-q
+flag is used;
+interrupts are ignored unless the
+.bd \*-i
+flag is used.
+The
+.bd \*-q
+and
+.bd \*-i
+are equivalent to performing an initial
+`ois' or `oqs' command (see the
+.it o
+command below).
+.s3
+The buffer labeled `~' is a ``startup'' buffer.  When \fIqed\fP starts up,
+a specified file (settable using qedfile(VI)) is read into
+buffer `~' and executed
+(i.e. read as command input) before 
+reading in files and accepting commands from the terminal.
+This is useful to set up options, registers, etc. (see below).
+Note that this also supercedes the prompt(I) command, which
+is not supported by
+.it qed.
+The default startup file may be overridden with the \fB-x\fR option.
+.s3
+.it Qed
+has 56 registers, labeled by bnames.
+(A register and buffer with the same bname are otherwise unrelated.)
+The registers are manipulated by the
+.it z
+command,
+which provides commands to handle the registers as
+simple strings or decimal numbers.
+The registers can be used to store any text.
+Registers are typically used to hold
+numbers, macros, programs and frequently-typed text.
+.s3
+Input to
+.it qed
+can be redirected, at any time,
+to come from storage such as a buffer or register
+by use of a
+.it special
+.it character
+such as ``\\b'' or ``\\z''.
+All the special characters in
+.it qed
+are discussed in detail below;
+they all begin with a
+backslash `\\'.
+It is unwise to type a backslash to
+.it qed
+before reading the section below which describes their
+interpretation.
+.s3
+\fIQed\fP has a truth flag (`t') that is set by the \fIz\fR, \fIo\fR, 
+\fI!\fR, \fI<\fR, \fI>\fR,
+and \fIs\fR commands.
+This truth flag can be used in the \fIy\fR and \fIh\fR commands (see below).
+It is set (reset) by the \fIs\fR command, if the substitution
+was (was not) performed,
+by register comparisons in \fIz\fR commands,
+and to the return status of the executed program
+in \fI!\fR, \fI<\fR, and \fI>\fR commands.
+.s3
+As well, \fIQed\fP has a `count', which is set to the number of
+characters transferred during i/o operations and to the
+number of substitutions made in the \fIs\fR command.
+It is also set by some register operations and the `ok' command.
+The count can be saved in a register by a \fIz\fR command.
+.s3
+Each buffer has associated with it a
+(possibly null) filename and a
+``changed'' flag, which is
+set if the contents of the buffer are known to differ
+from the contents of the named file in that buffer.
+It may also be set as desired by the `ocs' or `ocr' commands.
+.s3
+Commands to
+.it qed
+have a simple and regular structure: zero or
+more
+.it addresses
+followed by a single character
+\fIcommand\fP,
+possibly
+followed by parameters to the command.
+These addresses specify one or more lines in the buffer.
+Every command which requires addresses has default addresses,
+so that the addresses can often be omitted.
+.s3
+In general, any number of commands can appear on a line.
+Some commands require that the character following
+the command be a separator, such as blank, tab or newline.
+Usually,
+a display command,
+.it p,
+.it P,
+.it l,
+or
+.it L
+may precede the separator.
+Certain commands allow the input of text for placement in the buffer.
+This text can be supplied in two forms:
+either
+on the same line, after the command,
+or on lines following the command,
+terminated by a line containing only a period `\fB.\fP'.
+If the data is on the command line,
+it is separated from the command by a space or a tab.
+If the tab is used, it is considered part of the text.
+.s3
+.it Qed
+supports a limited form of
+\fIregular\fP \fIexpression\fP
+notation.
+A regular expression specifies
+a set of strings of characters.
+A member of this set of strings is said to be
+.it matched
+by the regular expression.
+Regular expressions in
+.it qed
+are delimited by enclosing them in a pair of identical characters,
+frequently slashes `/'.
+The regular expressions allowed by
+.it qed
+are constructed as follows:
+.s3
+.lp +6 4
+1.	An ordinary character
+(not `\\', `\fB.\fP', `[', `*', `+', `^', `$', newline, or the delimiting character)
+is a regular expression and matches that character.
+If
+.it qed
+is in
+\fIdualcase\fP \fIsearch\fP
+mode (see the
+.it o
+command)
+a letter is matched without regard to its case.
+.s3
+.lp +6 4
+2.	A backslash `\\' followed by
+any character in the list given in rule 1
+is a regular expression and matches that character.
+This form is used to match the delimiting character
+and the backslash itself.
+A backslash followed by one of
+`!', `_', `{', `}', `(' or `)'
+has a special meaning discussed below;
+otherwise, backslashes have literal meaning in regular expressions
+except for interpretation as special characters such as `\\b'.
+.s3
+.lp +6 4
+3.	A period `\fB.\fR' matches any character except a newline.
+.s3
+.lp +6 4
+4.	The sequence `\\!' matches any control character
+except tab or newline.
+.s3
+.lp +6 4
+5.	A string of characters enclosed in square brackets
+`[\ ]' matches any character in the string but no other.
+If the string contains a minus `\*-' with a character on either side of it,
+they together match any character lexically greater than or equal to
+the first and not greater than the second.
+If, however, the first character of the string is a caret
+`^' the regular expression matches any character except newline
+and the characters that would otherwise be matched.
+If it is desired to include a closing square bracket in the string,
+it must be the first character, except for the optional caret.
+Similarly, if it is desired to match a minus sign,
+it must either be the first or last character in the string (except for the
+optional caret).
+.s3
+.lp +6 4
+6.	A regular expression followed by an asterisk `*'
+matches any number of adjacent occurrences (including zero)
+of the regular expression it follows.
+The regular expression must be formed according to one of the first
+five rules.
+If the asterisk is the first character of the expression,
+after the optional caret `^' (see rule 10),
+or is the first character after a regular expression formed
+by rule 6 or rule 7,
+it matches the character `*'.
+.s3
+.lp +6 4
+7.	A regular expression followed by a plus sign `+'
+matches one or more occurrences of the regular expression.
+The regular expression must be formed according to one of the first
+five rules.
+If the plus sign is the first character of the expression,
+after the optional caret,
+or is the first character after a regular expression formed
+by rule 6 or rule 7,
+it matches the character `+'.
+.s3
+.lp +6 4
+8.	The sequence `\\_' matches a non-empty
+maximal-length sequence of blanks and tabs.
+.s3
+.lp +6 4
+9.	The concatenation of regular expressions is a regular
+expression which matches the concatenation of the strings
+matched by the components of the regular expression.
+.s3
+.lp +6 4
+10.	A caret `^' at the beginning of a regular expression
+matches the empty string at the beginning of a line.
+At any other place in a regular expression, it matches the character `^'.
+.s3
+.lp +6 4
+11.	A currency symbol `$' at the end of a regular expression
+matches the empty string at the end of a line.
+At any other place in a regular expression, it matches the character `$'.
+.s3
+.lp +6 4
+12.	The sequence `\\{' matches the begining of an identifier,
+that is, an empty string followed by a letter or underscore `_'
+and not preceded by a letter, digit, or underscore.
+.s3
+.lp +6 4
+13.	The sequence `\\}' matches
+the end of an identifier, that is,
+an empty string preceded by a letter, digit, or underscore,
+and not followed by a letter, digit, or underscore.
+.s3
+.lp +6 4
+14.	A regular expression enclosed between
+the sequences
+`\\(' and `\\)'is identical to the
+unadorned expression; the construction has side effects discussed
+under the
+.it s
+command.
+.s3
+.lp +6 4
+15.	The null regular expression standing alone
+is equivalent to the last regular expression encountered.
+.s3
+.i0
+Regular expressions are used in addresses to specify
+lines and in one command
+(see
+.it s
+below)
+to specify a portion of a line which is to be replaced.
+.s3
+To understand addressing in
+.it qed
+it is necessary to know that at any time there is a
+\fIcurrent buffer\fR
+and a
+\fIcurrent line.\fR
+When
+.it qed
+is invoked,
+the current buffer is
+buffer `a',
+but may be changed at any time by a
+.it b
+(change buffer) command.
+All addresses refer to lines in the current buffer,
+except for a special case described under the
+.it m
+(move) and
+.it t
+(copy)
+commands.
+.s3
+Generally speaking, the current line is
+the last line affected by a command; however,
+the exact effect on the current line
+is discussed under the description of
+the command.
+Addresses are constructed as follows.
+.s3
+.lp +6 4
+1.	The character `\fB.\fR' addresses the current line.
+.s3
+.lp +6 4
+2.	The character `$' addresses the last line of the buffer.
+.s3
+.lp +6 4
+3.	A decimal number
+.it n
+addresses the
+\fIn\fR-th
+line of the buffer.
+.s3
+.lp +6 4
+4.	`\*q\fIx\fR' addresses the line marked with the
+mark name character \fIx\fR,
+which must be a bname.
+Lines are marked with the
+.it k
+command described below.
+It is an error for the marked line to be outside of the current buffer.
+.s3
+.lp +6 4
+5.	A regular expression enclosed in slashes `/' addresses
+the first matching line
+found by searching forwards from the line after the current line.
+If necessary the search wraps around to the beginning of the
+buffer.
+.s3
+.lp +6 4
+6.	A regular expression enclosed in queries `?' addresses
+the first matching line
+found by searching backwards from the line before
+the current line.
+If necessary
+the search wraps around to the end of the buffer.
+.s3
+.lp +6 4
+7.	An address followed by a plus sign `+'
+or a minus sign `\*-' followed by a decimal number specifies that address plus
+(resp. minus) the indicated number of lines.
+The plus sign may be omitted.
+.s3
+.lp +6 4
+8.	An address followed by `+' or `\*-' followed by a
+regular expression enclosed in slashes specifies the first
+matching line following (resp. preceding) that address.
+The search wraps around if necessary.
+The `+' may be omitted,
+so `0/x/' addresses the \fIfirst\fP line in the buffer with an `x'.
+Enclosing the regular expression in `?' reverses the search direction.
+.s3
+.lp +6 4
+9.	If an address begins with `+' or `\*-'
+the addition or subtraction is taken with respect to the current line;
+e.g. `\*-5' is understood to mean `\fB.\fR\*-5'.
+.s3
+.lp +6 4
+10.	An address followed by `+' or `\*-' not followed by an operand,
+addresses the next (resp. previous) line.
+As a consequence of this rule and rule 9,
+the address `\*-' refers to the line before the current line,
+and `\*-\*-3' refers to the current line less 4.
+.s3
+.lp +6 4
+11.	To maintain compatibility with earlier versions of the editor,
+the character `^' in addresses is entirely
+equivalent to `\*-'.
+.s3
+.i0
+Commands may require zero, one, or two addresses.
+Commands which require no addresses regard the presence
+of an address as an error.
+Commands which accept one or two addresses
+assume default addresses when none is given.
+In commands expecting two addresses, these addresses denote
+a range of lines;
+if only one address is given, the range is taken to be the
+single addressed line.
+If more addresses are given than the command requires,
+the last one or two (depending on what is accepted) are used.
+The last addressed line must not precede the second-last addressed line.
+.s3
+Typically, addresses are separated from each other by a comma `,'.
+They may instead be separated by a semicolon `;'
+in which case the current line `\fB.\fR' is set to the first address
+before the second address is interpreted.
+Addresses may also be separated by an asterisk `*' in which case the
+first address defaults to line one (line zero if the buffer is empty),
+and the second is interpreted as if it were prefixed with `$'.
+Thus, the address list `*' denotes the whole buffer,
+and `7*' denotes all lines from seven on.
+.s3
+Filename operands of commands may be made up of printing characters only.
+However, when the filename appears as the argument to the invocation of
+\fIqed\fP,
+non-printing characters may be included.
+When a filename is specified for a command,
+it is terminated at the first blank, tab or newline.
+.s3
+In the following list of
+.it qed
+commands, the default addresses
+are shown in parentheses.
+The parentheses are not part of
+the address, but are used to show that the given addresses are
+the default.
+.s3
+.lp +5 5
+( \fB. \fR)a <text>
+.lp +5 5
+	The append command accepts input text
+and appends it after the addressed line.
+`\fB.\fR' is left
+on the last line input, if there
+were any, otherwise at the addressed line.
+Address `0' is legal for this command; text is placed
+at the beginning of the buffer.
+A `p', `l', `P' or `L'
+(hereinafter referred to generically as \fIdisplay characters\fR)
+immediately after the `a'
+causes the last line appended to be displayed, in the appropriate format,
+when all the text has been appended.
+.s3
+.lp +5 5
+b<bname>
+.lp +5 5
+	The change buffer command sets the current buffer
+to be that named, for subsequent
+.it qed
+commands.
+No blank is permitted between the `b' and the buffer name.
+`\fB.\fR', `$' and the remembered
+.it filename
+are set to those of the new buffer;
+upon return to a previously used buffer,
+`\fB.\fR' will be set to its value when the buffer was last used.
+.s3
+.lp +5 5
+( \fB. \fR)b[+-][pagesize][display character]
+.lp +5 5
+	The browse command provides page-oriented printing.
+The optional `+' or `\*-' specifies whether the next or previous
+page is to be printed; if absent, `+' is assumed.
+If a pagesize is given, it is used for the current browse
+command and remembered as the default.
+The pagesize is initially 20 lines.
+If a terminal display character is provided,
+the lines are printed in the specified format,
+and the format is remembered as the default.
+Initially, `p' is the default.
+After a browse command, `\fB.\fP is left at the last line displayed.
+NOTE: The browse and change buffer commands are the same character!
+This is for compatibility with
+.it ed.
+The two commands can be syntactically distinguished
+in all cases except for `b<display\ char>';
+this ambiguity may be resolved by typing the (implicit) `+'
+after the `b'.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)c <text>
+.lp +5 5
+	The change
+command deletes the addressed lines, then accepts input
+text which replaces these lines.
+`\fB.\fR' is left at the last line input; if there were none,
+it is left at the line preceding the deleted lines.
+.s3
+.lp +5 5
+cd filename
+.br
+The change directory command changes
+\fIqed\fP's
+current directory.
+The changed flag is set in all buffers whose file name
+does not begin with a slash `/'.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)d
+.br
+The delete command deletes the addressed lines from the buffer.
+The line after the deleted section becomes the current line;
+if the deleted lines were originally at the end,
+the new last line becomes the current line.
+The character after the `d' can only be one of
+a blank, newline or tab, a display character,
+or (idiomatically) `-'.
+Line 0 is a valid address for deletion;
+deleting line 0 has no affect on any lines in the buffer.
+.s3
+.lp +5 5
+e filename
+.br
+The edit
+command causes the entire contents of the current buffer to be deleted,
+and then the named file to be read in.
+`\fB.\fR' is set to the last line of the buffer.
+The number of characters read is typed
+if
+.it qed
+is in
+.it verbose
+mode.
+The \fIfilename\fP is remembered for possible use as a default file name
+in a subsequent
+\fIf\fP, \fIr\fR, \fIw\fR, or \fIW\fR command.
+.s3
+.lp +5 5
+f filename
+.br
+The filename command prints information about the current buffer,
+in the format used by the \fIn\fR command.
+If \fIfilename\fP is given,
+the currently remembered file name is changed to \fIfilename\fP.
+If
+.it qed
+is not in verbose mode,
+the information is only printed if the
+.it filename
+is not specified.
+If it is not desired to set the
+.it filename,
+the character immediately after the f must be a newline.
+Otherwise, the first token
+(which may be the null string)
+on the line, after a mandatory non-empty sequence of blanks and tabs,
+is taken to be the
+.it filename.
+These rules apply to all
+.it filename\c
+\(emusing commands,
+.it cd,
+.it e,
+.it f,
+.it r,
+.it R,
+.it S,
+.it w
+and
+.it W,
+although some regard specification of an explicitly null filename as an
+error.
+.s3
+.lp +5 5
+(1,$)g/regular expression/command list
+.br
+In the global
+command, the first step is to mark every line in the range which matches
+the regular expression.
+Then for every such line, the
+command list is executed with `\fB.\fR' initially set to that line.
+Any embedded newlines in the command list
+must be escaped with a backslash.
+The
+\fIa\fP,
+\fIi\fP,
+and
+.it c
+commands and associated input are permitted;
+the `\fB.\fR' terminating input mode may be omitted if it would be on the
+last line of the command list.
+If the command list contains an
+.it x
+command, the
+.it x
+command's input comes from the terminal, not the command list.
+The (global) commands,
+\fIg\fP,
+and
+\fIv\fP,
+are not permitted in the command list.
+If the command list is empty, `.p' is assumed.
+The regular expression may be delimited by any character other than newline.
+.s3
+.lp +5 5
+G/regular expression/command list
+.br
+In the GLOBUF
+command, the first step is to mark every active buffer
+whose output from an `f' command would match
+the regular expression.
+(An active buffer is one which has either some text or
+a remembered file name.)
+Then for every such buffer, the
+command list is executed with the current buffer set to that buffer.
+In other respects it is like the global command,
+except that only the GLOBUF commands, \fIG\fP and \fIV\fP,
+are not permitted in the command list.
+If the command list is empty, `f' is assumed.
+.s3
+.lp +5 5
+h<option> command list
+.br
+The until command provides a simple looping mechanism.
+The command list is a newline-terminated command sequence which forms
+the body of the loop; embedded newlines must be escaped with a backslash.
+The option specifies the exit condition for the loop,
+and is specified by the character(s) immediately following the `h'.
+Four options are recognized:
+.s3
+.lp +12 5
+hN	The loop is executed N times.  N must be a non-negative integer.
+If N is zero, the loop is executed zero times.
+.s3
+.lp +12 5
+ht	The loop is executed until the truth flag is true.
+.s3
+.lp +12 5
+hf	The loop is executed until the truth flag is false.
+.s3
+.lp +12 5
+ha	The loop is executed until an error or a `yo'
+(jump out of current input source) command is encountered.
+.s3
+.lp +5 5
+	The loop condition is tested
+.it after
+execution, so the `ht' and `hf' forms always execute at least once.
+.s3
+.lp +5 5
+( \fB. \fR)i <text>
+.lp +5 5
+	The insert command accepts input text
+and inserts it before the addressed line.
+`\fB.\fR' is left at the last line input; if there were none,
+at the line before the addressed line.
+This command differs from the
+.it a
+command only in the placement of the
+text.
+.s3
+.lp +5 5
+( \fB.\fR-1, \fB. \fR)j         or,
+.lp +5 5
+( \fB.\fR-1, \fB. \fR)j/replacement/
+.br
+The join command collapses all addressed lines into one by
+deleting the newline of each line but the last.
+The
+.it replacement
+(if any) is placed between joined lines,
+replacing newline characters.
+Newlines, backslashes `\\', and slashes `/' within
+.it replacement
+must be preceded by a backslash, which will be discarded.
+Note that only slashes may delimit
+\fIreplacement\fP.
+`\fB.\fP' is left at the (last) resulting line.
+Note: the join command in
+.it qed
+has a different default addressing from that in
+.it ed.
+.s3
+.lp +5 5
+( \fB. \fR)k\fIx\fR
+.br
+The mark command marks the addressed line with
+the given character,
+\fIx\fP,
+which must be a bname.
+(The bname used in the mark has no relation to any buffer;
+it is just a label.)\ 
+The address form `\*q\fIx\fR'
+(apostrophe followed by
+.it x)
+then addresses this line.
+`\fB.\fR' is not changed.
+The marks are global to
+.it qed\c
+; marking a line `x' erases any previous mark `x' in any buffer.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)l
+.br
+The list command
+prints the addressed lines in an unambiguous way:
+a tab is printed as `\\t', a backspace as `\\b',
+a non-printing character is
+printed as a backslash followed by three octal digits,
+and a long line is folded,
+with the second and subsequent sub-lines indented one tab stop.
+If the last character in the line is a blank,
+it is followed by `\\n'.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)L
+.br
+The LIST command
+is similar to the list command,
+but each line displayed is preceded by its line number,
+any marks it has (which appear as `\*q\fIx\fR'),
+and a tab.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)m\fIa\fR
+.br
+The move command repositions the addressed lines after the line
+addressed by
+\fIa\fP.
+The last of the moved lines becomes the current line.
+The address \fIa\fP can also be of the form
+<bname>address,
+in which case the text is moved after the address in the named
+buffer, rather than the current buffer.
+The buffer to which the text was moved becomes the current buffer.
+The original buffer (if different) has `\fB.\fR' left at the line before the moved lines.
+.s3
+.lp +5 5
+n
+.br
+The names command lists the bname,
+dollar
+and filename of all active buffers,
+i.e. the current buffer and all buffers which are non-empty
+or have an associated
+.it filename.
+If the buffer's changed flag is set, an apostrophe `\*q' is printed
+after the bname.
+The current buffer is indicated by a period `.' before the
+dollar value.
+A tab separates the dollar value from the
+.it filename.
+.s3
+.lp +5 5
+N
+.br
+The NAMES command is similar to the names command,
+but the display is only given for those buffers
+which have a saved file name and for which the changed flag is set.
+.s3
+.lp +5 5
+o\fIps\fP
+.br
+The option command allows various options to be set.
+The letter \fIp\fP
+specifies which option is being set.
+The rest of the command, \fIs\fP,
+specifies the setting.
+Most options can be either enabled or disabled;
+\fIs\fP is `s' to set the option,
+or `r' to reset it.
+The following table describes the available options.
+The default setting is shown after the option's letter.
+.s3
+.lp +12 5
+b	The browse option allows setting of the default command sequence to be
+performed when a newline command is typed at the terminal.
+The command sequence is set by following the `b' by a newline-terminated
+string.
+If the string is null, the newline command resumes its default behaviour.
+.s3
+.lp +12 5
+cr	The changed flag of the current buffer can be set or reset as desired.
+.s3
+.lp +12 5
+dr	Dualcase search mode
+affects rule one of regular expression construction
+so that a letter is matched without regard to its case.
+.s3
+.lp +12 5
+ir	Interrupt catching mode causes
+.it qed
+to exit cleanly when interrupted, including removal of the temporary file.
+.s3
+.lp +12 5
+k<address>\ The address, up to a newline, is checked for
+validity.  If it is an address in the buffer, the truth flag
+is set and the line number which the address matches is
+stored in the `count'.  If the address is invalid,
+the truth flag is reset (i.e. set to 0).
+(The \fIok\fR command is not an option,
+\fIper se\fR;
+it is so named for mnemonic reasons.)
+.s3
+.lp +12 5
+onr	Noisy mode causes automatic printing after substitute or
+xform commands.
+If the option is set (via `ons'), the xform command behaves as if
+it were `xp'; the substitute command is unaffected.
+If the option is set to a display character,
+xform behaves as `xp', and the line resulting from a substitution
+is printed in the specified format if no display character follows
+the substitute command.
+.s3
+.lp +12 5
+pr	Prompting mode causes `*' to be printed
+immediately before a command (as opposed to text)
+is read from the terminal.
+.s3
+.lp +12 5
+qr	Quit catching mode causes
+.it qed
+to dump core, leaving the temporary file intact,
+when a QUIT signal is received.
+.s3
+.lp +12 5
+Tr	Tracing mode causes
+all commands not typed directly by the user to be echoed on the terminal.
+When a special character (other than `\eB or `\eN')
+is encountered, a `[' is printed,
+followed by a code specifying the character \(em
+`za' for register `a', `g' for global command list,
+`l' for `\el', `B' for browse pseudo-register, etc.
+Then, an `=' is printed, followed by the interpretation
+of the special character, followed by a `]'.
+.s3
+.lp +12 5
+us	Uppercase conversion mode enables case transformation in
+substitute commands.
+If the `u' flag is set, the character caret (`^') 
+becomes non-literal in the replacement text of a substitution.
+It behaves just like `&', but with case switching of alphabetics
+in the replaced text.
+If the flag is `u', all alphabetics are mapped to upper case;
+if `l', lower case; and if `s', the case is switched.
+.s3
+.lp +12 5
+vs	Verbose mode causes character counts to be printed
+after
+\fIe\fP,
+\fIr\fP,
+\fIw\fP,
+\fIR\fP,
+\fIS\fP,
+and
+.it W
+commands.
+It also causes `!' to be printed upon completion of the \fI!\fR,
+\fI<\fR and \fI>\fR commands.
+The verbose mode may be reset by the use of a flag when invoking
+\fIqed\fP.
+.s3
+.lp +12 5
+?\fIc\fP	\fIc\fP must be one of
+`c', `d', `i', `p', `T' or `v'.
+The value of the corresponding flag is stored in the truth.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)p
+.br
+The print command prints the addressed lines on the standard output
+(usually the user's terminal).
+`\fB.\fR'
+is left at the last line printed.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)P
+.br
+The PRINT command is similar to the print command,
+but each line displayed is preceded by its line number,
+any marks it has (which appear as `\*q\fIx\fR'),
+and a tab.
+.s3
+.lp +5 5
+q
+.br
+The quit command causes
+.it qed
+to exit.
+No automatic write
+of a file is done.
+.s3
+.lp +5 5
+($)r filename
+.br
+The read command
+reads in the given file after the addressed line.
+If no file name is given,
+the remembered file name, if any, is used
+(see
+.it e
+and
+.it f
+commands).
+The filename is remembered if there was not already a
+remembered file name in the current buffer.
+Address `0' is legal for
+.it r
+and causes the
+file to be read at the beginning of the buffer.
+If
+.it qed
+is in
+.it verbose
+mode and the read is successful, the number of characters
+read is typed.
+`\fB.\fR' is left at the last line read in from the file.
+.s3
+.lp +5 5
+R filename
+.br
+The restore command restores an environment saved by a save (\fIS\fR) command.
+The changed flag in each buffer is restored from the files; all other flags
+are unaffected.
+The input stack is reset to the top (teletype input) level,
+and the current buffer becomes `a'.
+`\fB.\fP' is left at the saved value of `\fB.\fP' in buffer `a'\fB.\fP
+If the filename is not specified, `q' is used.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)s\fIn\fR/regular expression/replacement/         or,
+.lp +5 5
+( \fB. \fR, \fB. \fR)s\fIn\fR/regular expression/replacement/g
+.br
+The substitute command searches each addressed
+line for occurrences of the specified regular expression.
+The decimal number \fIn\fP defaults to 1 if missing.
+On each line in which
+.it n
+matches are found,
+the \fIn\fPth matched string is replaced with
+\fIreplacement\fP.
+If the global replacement indicator `g' follows the command,
+all subsequent matches on the line are also replaced.
+Within a line, a search starts from the character following the last match,
+unless the last match was an empty string,
+in which case the search starts at
+the second character following the empty string
+(to ensure a match is not repeated).
+It is an error for the substitution to fail on all addressed lines.
+Any character other than newline or a numeral
+may be used instead of `/' to delimit the regular expression
+and \fIreplacement\fP.
+`\fB.\fR' is left at the last line substituted.
+.s2
+An ampersand `&' appearing in \fIreplacement\fP
+is replaced by the string matching the regular expression.
+As a more general feature,
+the characters
+`\\\fIn\fR',
+where
+.it n
+is a digit,
+are replaced by the text matched by the
+\fIn\fR-th
+regular subexpression
+enclosed between `\\(' and `\\)'.
+When
+nested, parenthesized subexpressions
+are present,
+.it n
+is determined by counting occurrences of `\\(' starting from the left.
+.s2
+A caret `^' appearing in \fIreplacement\fP
+behaves much like an ampersand,
+but provides a mechanism for case switching of alphabetics,
+as discussed under the \fIo\fR command.
+To include an ampersand `&', caret `^', backslash `\\', newline,
+or the delimiter literally in
+\fIreplacement\fP,
+the character must be preceded by a backslash.
+(Note that because special characters are interpreted early
+in command processing, certain characters, such as double quote,
+are poor choices for delimiter as they cannot be escaped easily.)
+Lines may be split by substituting newline characters into them.
+.s3
+.lp +5 5
+S filename
+.br
+The save command saves the full buffer and register information in two
+files called `filename:aq' and `filename:bq'.
+If the filename is absent, `q' is used.
+If the filename has more than 12 characters after the last slash `/',
+it is truncated to 12 characters to avoid overwriting the file.
+.s3
+.lp +5 5
+( \fB.\fR , \fB.\fR )t\fIa\fR
+.br
+The copy command makes a copy of the addressed lines,
+and appends it after the line addressed by \fIa\fR
+(which may be 0).
+`\fB.\fR' is left on the last line of the copy.
+The address \fIa\fP can also be of the form
+<bname>address,
+in which case the text is copied after the address in the named
+buffer, rather than the current buffer.
+The buffer to which the text was copied becomes the current buffer.
+The original buffer (if different) has `\fB.\fR' left at the line before the copied lines.
+.s3
+.lp +5 5
+u
+.br
+The undo command restores the last line changed by a
+\fIs\fP,
+\fIu\fP,
+or
+.it x
+command.
+Any new lines created by splitting the original are left.
+It is an error if the line is not in the current buffer.
+`\fB.\fP' is left at the restored line.
+.s3
+.lp +5 5
+(1,$)v/regular expression/command list
+.br
+This command is the same as the global command
+except that the command list is executed
+with `\fB.\fR' initially set to every line
+.it except
+those
+matching the regular expression.
+.s3
+.lp +5 5
+V/regular expression/command list
+.br
+This command is the same as the GLOBUF command
+except that the command list is executed
+with the current buffer initially set to every active buffer
+.it except
+those
+matching the regular expression.
+.s3
+.lp +5 5
+(1,$)w filename
+.br
+The write command writes the addressed lines onto
+the given file.
+If the file does not exist,
+it is created mode rw-rw-rw- (readable and writable by everyone).
+The filename is remembered if there was not already a
+remembered file name in the current buffer.
+If no file name is given,
+the remembered file name, if any, is used
+(see
+.it e
+and
+.it f
+commands).
+`\fB.\fR' is unchanged.
+If
+.it qed
+is in
+.it verbose
+mode and
+the command is successful, the number of characters written is
+typed.
+If the buffer is empty,
+no write is attempted.
+.s3
+.lp +5 5
+(1,$)W
+.br
+The WRITE command is similar to, but more imperative than, the write command.
+Unlike the write command, it will write an empty file if the buffer is empty.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)x
+.br
+The xform command allows one line at a time to be modified according to
+graphical requests.
+The line to be modified is typed out,
+and then the modify request is read from the terminal
+(even if the xform command is in a global command or other
+nested input source).
+Generally each character in the request specifies how to
+modify the character immediately above it, in the original line,
+as described in the following table.
+.s3
+.lp +11 4
+#	Delete the above character.
+.s3
+.lp +11 4
+%	Replace the above character with a space.
+.s3
+.lp +11 4
+^	Insert the rest of the request line before the above character.
+If the rest of the request line is empty, insert a newline character.
+.s3
+.lp +11 4
+$	Delete the characters in the above line from this position on;
+replace them with the rest of the request line.
+.s3
+.lp +11 4
+space or tab: Leave above character(s) unchanged.
+.s3
+.lp +11 4
+any other: This character replaces the one above it.
+.s3
+.lp +5 5
+	If the request line is longer than the line to be modified,
+the overhang is added to the end of the line
+without interpretation,
+that is, without treating any characters specially.
+Any characters after a `^' or `$' request are not interpreted either.
+.s3
+If a character has no width, or a negative width,
+the modification would be confusing.
+For this reason, xform will not process control characters other
+than tab and newline,
+except in contexts where it need not know their width
+(that is, after a `^' or `$' request, or in the part of
+either the request or the line that overhangs the other).
+Remember that the ERASE character (processed by the system)
+erases the last character typed,
+not the last column.
+.s3
+Some characters take more than one column of the terminal
+to enter or display.
+For example, entering the ERASE or KILL characters literally
+takes two columns because they must be escaped.
+To delete a multi-column character,
+one must type `#' under all its columns.
+To replace a multicolumn character,
+the replacement must be typed under the first column of the character.
+Similarly, if a replacement character is multi-columned,
+it replaces the character in its first column.
+.s3
+The tab character prints as a sequence of spaces, and may be
+modified as if it were that sequence.
+As long as the last space is unmodified, it and the
+remaining contiguous spaces will represent a tab.
+.s3
+Usually all the modifications desired can be specified by one request.
+This is not necessarily the case when a `^' request is used,
+since no modifications can be made to the line beyond the point of
+the `^'.
+For this reason, whenever a request contains an interpreted `^',
+the modification process is repeated after the request has been processed.
+If the
+.it x
+command had a
+.it p
+suffix,
+the modification process is repeated until the request is empty
+even if there was no `^' request.
+Note that this suffix allows one to see the line in its final form.
+Only `p' or a space, tab or newline may immediately follow the `x'.
+.s3
+.lp +5 5
+y<condition><type>
+.br
+The jump command controls execution of buffer or global/GLOBUF/until input.
+The condition is compared to the truth flag to see if the jump
+should be performed;
+if a `t', the jump is performed if the truth flag is true,
+if an `f', the jump is performed if the truth flag is false,
+if absent (i.e. any other character immediately after the `y'),
+the jump is always performed.
+Several types of jumps exist:
+.s3
+.lp +12 5
+y[tf]o\ Jump out of the current input source (buffer, register, global command
+line, etc.).  If the current input source is the command line
+for a \fIg\fR, \fIG\fP, \fIv\fR, \fIV\fR or \fIh\fR command , the command is terminated.
+.s3
+.lp +12 5
+y[tf]\fIN\fR\ Control is transferred to absolute line \fIN\fR (an integer)
+in the current buffer.
+The current input source must be a buffer.
+.s3
+.lp +12 5
+y[tf]\(aa<label>\ Control is transferred to the first line found,
+searching forward in the buffer,
+that begins with a comment <label>.
+The match of the labels must be exact;
+regular expressions are not used to define the control label.
+(A tab, blank or newline after the double quote specifies a null label:
+a line beginning `"\ LAB' cannot be transferred to by this form of jump.)\ 
+For example, `y\(aaLAB' transfers control to a line `"LAB'.
+If no such label is found,
+control resumes at the character after the label in the jump command.
+The current input source must be a buffer.
+.s3
+.lp +12 5
+y[tf]\(ga<label>\ Similar to `y\(aa<label>',
+but the search is in the opposite (upward) direction.
+.s3
+.lp +12 5
+y[tf]\ If no
+recognized type is given,
+input is skipped up to the next newline.
+.in 7
+It is an error if reading the label or line number for a jump command
+causes the current input source (i.e. buffer) to be `popped.'
+This can happen if the label is the last word in the buffer,
+but can be circumvented by putting an extra blank or newline after
+the jump command.
+.s3
+.lp +5 5
+( \fB.\fR, \fB.\fR  )z\fIX@\fR
+.br
+\fIQed\fP has 56 registers labeled by bnames.
+The contents of the registers can be inserted into the input stream;
+see the section on ``Special Characters.''
+The command \fIzX\fR, where \fIX\fR is a bname,
+specifies register \fIX\fR
+as the argument to
+the operation character (signified above by \fI@\fR) that follows it.
+In the description below,
+\fIN\fR stands for a possibly signed decimal integer
+and \fIS\fR stands for a newline-terminated string.
+Newlines may be embedded in registers by escaping
+them with a backslash `\\'.
+The operations are as follows:
+.s1
+.lp +12 5
+p	Print the value of the register in `l' format.
+.lp +12 5
+\&\fB.\fR	Set the register to the contents of the current line (dot).
+.lp +12 5
+/pattern/	\ Set the register to the portion of the
+current line that matches the regular expression in slashes.
+If no such pattern is found,
+the register is cleared and the truth flag is reset.
+.lp +12 5
+\fB:\fR\fIS\fR	Set register to the string following the colon.
+.lp +12 5
+$\fIS\fR	Append the string \fIS\fR at the end of the register.
+.lp +12 5
+^\fIS\fR	Insert the string \fIS\fR at the beginning of the register.
+.lp +12 5
+\&\(aa\fIY\fR	Make a direct copy of register \fIY\fR in register \fIX\fR,
+without interpreting special characters.
+\fIY\fR is any register bname.
+.lp +12 5
++\fIN\fR	Increment by \fIN\fR the ASCII value of each character in the register.
+.lp +12 5
+-\fIN\fR	Decrement by \fIN\fR the ASCII value of each character in the register.
+.lp +12 5
+=\fIS\fR	Set truth flag to true if register is equal to the string \fIS\fR.
+.lp +12 5
+<\fIS\fR	Set truth flag to true if register is lexically less than \fIS\fR.
+.lp +12 5
+>\fIS\fR	Set truth flag to true if register is lexically greater than \fIS\fR.
+.lp +12 5
+l	Set the `count' to be the length of the register.
+.lp +12 5
+)\fIN\fR	`Take'
+the first \fIN\fR characters of the register, i.e. truncate at the \fIN\fR+1'th
+character.
+If \fIN\fR is negative, take \fIN\fR from the end.
+.lp +12 5
+(\fIN\fR	`Drop'
+the first \fIN\fR characters of the register.
+If \fIN\fR is negative, drop from the end.
+.lp +12 5
+[\fIS\fR	Set the `count' to the starting index of the string \fIS\fR in
+the register.  If the string is not a substring of the register,
+the `count' is set to -1.
+.lp +12 5
+C	`Clean' the register: collapse all `white space' in the register
+to single blanks, and delete initial blanks.
+.s3
+.in 7
+The registers can also be dealt with numerically.
+Numerical operators must be preceded by a number sign `#',
+e.g. `zx#+2'.
+It is an error to attempt to perform arithmetic on a
+register containing non-numeric text other than a leading sign.
+The numerical operations are:
+.s1
+.lp +12 5
+a	For `Address'.  Set the value of the register to be the value of
+the address given to the command; e.g. `$za#a' sets register `a'
+to the number of lines in the buffer.
+`.' is unchanged.
+.lp +12 5
+r	For `Range'. Set register \fIX\fR to be the first address
+given the command,
+and \fIX\fR+1 to be the second.  If \fIX\fR is `~', an error is generated.
+For example, `5,$zi#r' sets register `i' to 5, and
+register `j' to the value of `$'.
+`.' is unchanged.
+This command is usually used to pass addresses to a command buffer.
+.lp +12 5
+l	Set register to the length of the current line.
+.lp +12 5
+\fB:\fR\fIN\fR	Set register to \fIN\fR.
+Scanning of the number stops at the first non-numeric character,
+not at the end of the line.
+.lp +12 5
+c	Set the register to the value of the `count'.
+.lp +12 5
+t	Set register to the value of the truth register.
+.lp +12 5
++\fIN\fR	Increment register by \fIN\fR. `-', `*', `/', and `%'
+decrement, multiply, divide, or modulo the register by \fIN\fR.
+.lp +12 5
+?	Set register to a pseudo-random number.  The seed for the generator
+is based on the process id, and so is
+different each time \fIqed\fP is invoked.
+.lp +12 5
+=\fIN\fR	Set truth flag to true if register is numerically equal to \fIN\fR.
+.lp +12 5
+<\fIN\fR	Set truth flag to true if register is less than \fIN\fR.
+.lp +12 5
+>\fIN\fR	Set truth flag to true if register is greater than \fIN\fR.
+.s1
+.in 7
+Several numerical operations may be combined in one command
+(and it is more efficient to do so when possible.)
+For example, `$zd#a#-3' sets register `d' to three less than the value
+of `$'.
+.s3
+.lp +5 5
+Z
+.br
+The ZERO command clears a buffer.
+The contents, filename and all flags for the buffer are zeroed.
+The character after the `Z' must be a blank, tab or newline.
+.s3
+.lp +5 5
+($)=
+.br
+The line number of the addressed line is typed.
+`\fB.\fR' is unchanged by this command.
+.s3
+.lp +5 5
+!UNIX command
+.br
+The bang command sends the
+remainder of the line after the `!'
+to the UNIX shell(I) to be interpreted as a command.
+The signals INTR, QUIT, and HUP are enabled or disabled
+as on entry to
+\fIqed\fP.
+At the completion of the command,
+if
+.it qed
+is in
+.it verbose
+mode, an `!' is printed.
+The return status of the command is stored in the truth flag.
+`\fB.\fR' is unchanged.
+.s3
+.lp +5 5
+(1,$)>UNIX command
+.br
+The zap command is similar
+to the bang command,
+but the addressed lines become the default standard input of the command.
+.s3
+.lp +5 5
+($)<UNIX command
+.br
+The crunch command is similar to the bang command,
+but the standard output of the command is appended to the current buffer
+after the addressed line, as though read with an \fIr\fR command
+from a temporary file.
+`.' is left at the last line read.
+.s3
+.lp +5 5
+( \fB.\fR )"
+.br
+The comment command sets dot to the addressed line, and ignores
+the rest of the line up to the first following double quote or newline.
+If, however, the character immediately after the double quote is
+a second double quote (i.e. the command is ``""''),
+the text which would normally be ignored is printed on the standard output.
+Special characters in the text will be interpreted, whether or not
+the text is printed,
+so to print a message such as ``Type \\bx'' requires the command
+``""Type \\cbx''.
+Commented lines are used as labels by the
+.it y
+(jump) command.
+.s3
+.lp +5 5
+%
+.br
+The register print command displays the name and value of all defined
+registers,
+followed by the \\p (`P') and \\r (`R') pseudo-registers,
+and the browse (`B') psuedo-register, if defined.
+.s3
+.lp +5 5
+#
+.br
+The numeric register print command displays the name and value of all
+defined registers with numeric values,
+followed by the truth flag (`T') and count (`C').
+.s3
+.lp +5 5
+%
+.br
+The register print command displays the name and value of all defined
+registers,
+followed by the \\p (`P') and \\r (`R') pseudo-registers,
+and the browse (`B') psuedo-register, if defined.
+.s3
+.lp +5 5
+( \fB.\fR+1, \fB.\fR+1 )<newline>
+.br
+An address or addresses alone on a line
+cause the addressed lines to be printed.
+If the last address separator before the newline was `;',
+only the final addressed line is printed.
+A blank line alone causes the contents of the
+browse pseudo-register (described with the
+.it o
+command) to be executed.
+If it is null, as it is initially,
+the newline command behaves as though the register contains
+`.+1p'.
+.s3
+.s3
+.i0
+.ul
+Special Characters
+.s3
+\fIQed\fP has some special character sequences with non-literal
+interpretations.
+These sequences are processed at the
+.it lowest
+level of input, so their interpretation is completely transparent
+to the actual commands.
+Whenever input from the user is expected, a special character can appear and
+will be processed.
+Special characters can be nested in the sense that, for example,
+a buffer invoked by `\\b' can contain a register invocation `\\z'.
+Backslashed escape sequences such as `\\(' in regular expressions
+are
+.it not
+special characters, so are not interpreted at input.
+The sequence `\\(' is left untouched by the input mechanism of
+.it qed;
+any special meaning it receives is given it during regular expression
+processing.
+The special characters are:
+.s3
+.lp +5 5
+\eb<bname>\ 	The `b' must be followed by a bname.
+When `\eb\fIX\fR' is typed,
+the contents of buffer \fIX\fR, up to but \fInot including\fP the last
+newline, are read as if they were entered from the keyboard.
+Typically, the missing newline is replaced by the newline which
+appears after the buffer invocation.
+.s3
+.lp +5 5
+\eB	Equivalent to current buffer's bname.
+.s3
+.lp +5 5
+\ec	The sequence \ec is replaced by a single backslash,
+which is not re-scanned.
+The effect of the `c' is to delay interpretation of a special
+character.
+.s3
+.lp +5 5
+\ef	Equivalent to current buffer's file name.
+.s3
+.lp +5 5
+\eF<bname>\ 	Equivalent to the file name in the named buffer.
+.s3
+.lp +5 5
+\el	One line is read from the standard input up to, but \fInot including\fP
+the terminal newline, which is discarded.
+Note that the first invocation will read the remainder of the last
+line entered from the keyboard.
+For example, if a buffer is invoked by typing the line:
+.s1
+.ti +5
+\ebxjunk
+.s1
+the first \el in buffer `x' will return the string `junk'.
+.s3
+.lp +5 5
+\eN	Translates into a newline.
+Primarily useful when delayed (see below).
+The `N' is upper case so that `\\n' (like `\\t') never has
+special meaning in
+.it qed.
+.s3
+.lp +5 5
+\ep	Equivalent to the last regular expression used.
+.s3
+.lp +5 5
+\er	Equivalent to the last expression used in the replacement text of a
+substitute or join command.
+.s3
+.lp +5 5
+\ez<bname>\ 	Equivalent to the contents of register `\ez\fIX\fR'.
+.s3
+.lp +5 5
+\ez+<bname>\ 	Equivalent to \ez\fIX\fR, except that the characters in the register
+have their ASCII value incremented by one before interpretation.
+.s3
+.lp +5 5
+\ez-<bname>\ 	Equivalent to \ez\fIX\fR, except that the characters in the register
+have their ASCII value decremented by one before interpretation.
+.s3
+.lp +5 5
+\ez#+<bname>\ Similar to \ez+\fIX\fR, but the contents of the register are numerically
+incremented.  An error is generated if the register contains non-digits
+other than a leading sign.
+.s3
+.lp +5 5
+\ez#-<bname>\ Similar to \ez-\fIX\fR, but the contents of the register are numerically
+decremented.  An error is generated if the register contains non-digits
+other than a leading sign.
+.s3
+.lp +5 5
+\e"	The sequence \e" means `no character at all'!
+It is primarily used to delay interpretation of a period
+that terminates an append, until the second or third time
+it is read (i.e. in loading execution buffers):
+the sequence \ec". at the beginning of a line
+puts a period on the line which will terminate
+an append the second time it is read.
+.s3
+.lp +5 5
+\e\*q[bfFlprz]\ 	If an apostrophe
+appears between the backslash and the identifying character
+for one of the special characters `\eb', `\ef', `\eF', `\el', `\ep',
+`\er' or `\ez', interpretation is as usual except that
+any further special characters \fIembedded\fP
+in the buffer, register, etc. are \fInot\fP interpreted.
+.s3
+.i0
+The rules for interpreting a special character are fairly simple
+(but quite different from the backslash handling in most UNIX
+tools.).
+A special character is interpreted immediately when it appears
+in the user's input stream,
+whether it is currently coming from
+the teletype, a buffer, a register, etc.
+Thus, interpretation is recursive unless the special character
+is `\ec'.
+Special characters appearing in text processed in a command such
+as move, read or write, are \fInot\fP interpreted.
+If the backslash-character pair is not a special character
+from the above list, it is passed unchanged.
+Interpretation may be delayed using `\ec'; for example,
+if a `\ebx' is to be appended to a buffer for later interpretation,
+the user must type `\ecbx'.
+To delay interpretation 5 times, 5 c's must be placed between the
+backslash and the identifying character.
+In regular expressions and substitutes,
+a backslash preceding a metacharacter turns off its special meaning.
+Even in these cases,
+a backslash preceding an ordinary character is not deleted,
+unlike in \fIEd\fP.
+For example, since the `g' command must read its entire line,
+a `\ezx' in a substitute driven by a global must be delayed
+if the contents of the register are to be different for each line,
+but since `\e&' is not a special character except to the substitute,
+its interpretation need not be delayed:
+.sp
+.ti +5
+g/\e$/ s/\e.xyz/\eczx \e&/p zx+1
+.sp
+globally searches for lines with a literal currency sign,
+and on each one substitutes for `.xyz' the contents
+of register `x'
+at the time of substitution,
+followed by a space and a literal ampersand.
+The contents of register `x' are then incremented.
+As a second example, the substitute
+.ti +5
+.sp
+s/xyz/\e\eN&/
+.sp
+replaces `xyz' with a newline followed by `xyz'.
+Note that the `\e\eN' is interpreted as
+`backslash followed by newline,'
+as the sequence `\\\\<ordinary\ character>'
+.ft I
+has no special meaning in qed
+.ft R
+outside of regular expressions.
+However,
+to match, say, `\e\ez' using a regular expression, it must be entered
+as `\e\e\ecz'.
+.s3
+.s3
+If an interrupt signal (ASCII DEL) is sent,
+.it qed
+prints `??' and returns to its command level.
+If a hangup signal is received and the buffer is not empty,
+.it qed
+executes the command `S qed.hup'.
+.s3
+Some size limitations:
+512 characters per line,
+256 characters per global command list,
+1024 characters of string storage area,
+used for storing registers, file names and regular expressions,
+16 levels of input nesting,
+and 128K characters in the temporary file.
+The limit on the number of lines depends on the amount of core:
+each line takes 1 word.
+.sh FILES
+/tmp/q#, temporary;
+`#' is the process number (six decimal digits).
+.sh DIAGNOSTICS
+Diagnostics are in the form of `?' followed by a single letter code.
+If the diagnostic is because of an inaccessible file,
+the offending file name is also displayed.
+If input is not from the highest level (i.e. the standard input,
+usually the terminal), a traceback is printed, starting with the
+lowest level.
+The elements of the traceback
+are of the form ?b\fIXM.N\fR or ?z\fIXN\fR,
+where \fIX\fR is the buffer or register being executed when the
+error was encountered,
+\fIM\fR is the line number in the buffer and \fIN\fR is the character
+number in the line or register.
+The possible errors are:
+.s3
+.lp +4 3
+F	bad bname for \\F
+.lp +4 3
+G	nested GLOBUF commands
+.lp +4 3
+N	last line of input did not end with newline
+.lp +4 3
+O	unknown option in the \fIo?c\fP command
+.lp +4 3
+R	restore (\fIR\fR) command failed
+(file not found or bad format)
+.lp +4 3
+T	I/O error or overflow in tempfile
+.lp +4 3
+Z	out of string space; clear a few registers or file names
+.lp +4 3
+a	address syntax
+.lp +4 3
+b	bad bname in a \fIb\fR command or for \\b
+.lp +4 3
+c	ran out of core
+.lp +4 3
+d	bad directory name in cd command
+.lp +4 3
+f	filename syntax error
+.lp +4 3
+g	nested global commands
+.lp +4 3
+i	more than 52 files in initialization argument list
+.lp +4 3
+k	bad bname in \fIk\fR command
+.lp +4 3
+l	an internal table length was exceeded
+.lp +4 3
+m	tried to move to an illegal place [e.g. 1,6m4]
+.lp +4 3
+o	error opening or creating a file
+.lp +4 3
+p	bad regular expression (pattern) syntax
+.lp +4 3
+r	read error from file
+.lp +4 3
+s	no substitutions found
+.lp +4 3
+t	bad \fIx\fR command data or terminal type unknown
+.lp +4 3
+u	no line for \fIu\fR command to undo
+.lp +4 3
+x	command syntax error
+.lp +4 3
+w	write error on file
+.lp +4 3
+y	bad jump command (including popping the input buffer while scanning the label)
+.lp +4 3
+z	bad register bname
+.lp +4 3
+|	failure to create pipe for \fI>\fR or \fI<\fR command
+.lp +4 3
+#	bad numeric register operation
+.lp +4 3
+$	line address out of range
+.lp +4 3
+?	interrupt
+.lp +4 3
+/	line search failed
+.lp +4 3
+[	bad index in a register take or drop command
+.lp +4 3
+\\	attempt to recursively append a buffer
+.lp +4 3
+!	jackpot -- you found a bug in regular expression matching
+.i0
+.s3
+.sh "SEE ALSO"
+qedfile(I)
+.br
+qedbufs(I)
+.br
+A Tutorial Introduction to the ED Text Editor
+(B. W. Kernighan)
+.br
+Programming in
+.it Qed:
+a Tutorial
+(Robert Pike)
+.br
+ed(I)
+.sh "U of T INFO"
+Written at U of T,
+based on several incarnations of
+.it ed,
+with contributions from
+Tom Duff, Robert Pike, Hugh Redelmeier and David Tilbrook.
+.i0

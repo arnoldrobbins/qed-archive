@@ -1,0 +1,24 @@
+.th PICK I Nov/76
+.sh NAME
+pick \*- choose which arguments to send to standard output
+.sh SYNOPSIS
+pick ...
+.sh DESCRIPTION
+Pick prints each of its arguments in turn on the diagnostic output and
+waits for a line to be typed on the user's teletype.
+If the line starts with a 'y', the argument is copied to standard output.
+If the line starts with an 'x', pick exits.
+.ti+5
+Pick is mainly useful in conjunction with args(I).
+For example:
+	pick * | args rm -f
+.br
+is equivalent to dsw(I).
+.sh FILES
+/dev/tty -- to read y's and x's from
+.sh "SEE ALSO"
+args(I)
+.sh "U of T INFO"
+Written at the University of Toronto by
+Tom Duff
+.sh BUGS

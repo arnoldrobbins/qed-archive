@@ -1,0 +1,30 @@
+.th "QEDFILE" "I" "79 06 03"
+.sh NAME
+qedfile \*- display or set default qed startup file for user
+.sh SYNOPSIS
+.it qedfile
+[ -N ] [ filename ]
+.sh DESCRIPTION
+.it Qedfile
+reads "/etc/qedfile" and looks for line corresponding to
+the current user.
+It will then display the current setting.
+If \\fIfilename\\fR is given
+the startup file is set to that value.
+.s3
+\\fIFilename\\fR cannot be 32 characters or longer.
+.s3
+If the user id is the super user,
+and the \\fIN\\fR argument is given,
+the user id is taken to be the value of \\fIN\\fR.
+.sh "SEE ALSO"
+qed(I)
+.sh FILES
+/etc/qedfile
+.sh DIAGNOSTICS
+.sh "U of T INFO"
+Written at BNSR by
+David Tilbrook
+.sh BUGS
+If user id is greater than current size of "/etc/qedfile"
+then user file cannot be set.

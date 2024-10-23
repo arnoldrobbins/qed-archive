@@ -1,0 +1,118 @@
+.th MAKE I Nov/76
+.sh NAME
+make \*- automatically update large systems
+.sh SYNOPSIS
+make [flags] [makefile]
+.sh DESCRIPTION
+Make provides a mechanism for keeping track of the dependencies
+amongst systems of files, and for automatically performing any updating
+operations that may be necessary as a result of changing any of the files
+in a system.
+Its major use is expected to be in the maintenance of large
+systems written in C, where the source code may be spread out
+amongst a number of files, each of which may #include a number of
+other files.
+When, for example, a #include file is changed, all files which
+use it should likely be recompiled.
+.ti+5
+Make reads a dependency list out of a file.
+The file is processed by the C preprocessor before make interprets it.
+Thus, in particular, #include and #define lines can be used in the makefile.
+If an argument is given, it is used as the name of the
+dependency file.
+Otherwise, a file called "makefile" in the current working
+directory is used.
+Each line in the file is of the form
+.br
+	file1 file2 [command]
+.br
+.br
+where file1, file2 and the optional command are separated from
+one another by one or more blanks or tabs.
+File1 is said to depend on file2
+(e.g. a C programme depends on all the files it includes).
+The command can be any sequence of shell commands, and may extend over
+multiple lines,
+in which case each newline character in the command sequence must be
+immediately preceded by a backslash, which is deleted
+before executing the command.
+Lines beginning with a colon are ignored, and can therefore be interpreted
+as comment lines.
+Make executes commands by writing the command lines into a temporary
+file and passing it out to the shell.
+File1 and file2 are made available to the shell as arguments $1 and $2.
+File1 or file2 may refer to members of an archive by writing the name of the archive
+followed by a colon (:) followed by the membername.
+For example, the string /lib/libc.a:printf.o refers to the object file
+printf.o archived in /lib/libc.a.
+Any time an archive member is mentioned, an implicit dependency of the archive
+on its member is introduced.
+.ti+5
+For any pair of files file1 and file2, if file1 depends on file2,
+and file2 has a more recent modification date than file1,
+the command sequence for the relevant dependency is executed
+in order to bring file1 up to date.
+Files which do not exist are deemed
+to have a last modification date of 0:00 GMT Jan 1 1970.
+Make knows that the dependency relation is transitive, so if, for example,
+A depends on B, and B depends on C, and C has been changed since B was
+last updated,
+make will update B, and then update A.
+In general, arbitrary acyclic graphs of dependencies may be constructed.
+
+Make understands the following flags:
+.in+6
+.ti-4
+-v\ \ verbose mode -- prints out much debugging information
+.ti-4
+-V\ \ same as -v
+.ti-4
+-e\ \ print commands on diagnostic output as they are executed
+.ti-4
+-o\ \ print commands on standard output as they are executed
+.in-6
+.br
+As well, any flags understood by the C preprocessor (-D -P -E -U -I) are passed
+on when it is called.
+.sh FILES
+makefile -- the default dependency list.
+.br
+/tmp/make*
+.br
+/lib/cpp -- the C preprocessor.
+.sh "SEE ALSO"
+sh (I)
+.br
+ar (I)
+.br
+cc (I)
+.sh DIAGNOSTICS
+can't create temp file
+.br
+multiple makefiles not allowed
+.br
+too many dependencies -- there is room for 1024 entries in the
+dependency table.
+.br
+out of core -- your makefile is too large to process
+.br
+too many files -- there are 512 slots in the file table.
+.br
+temp disappeared -- should never happen
+.br
+can't fork
+.br
+can't exec
+.br
+circularity -- your dependency list has a loop in it
+(e.g. A depends on B, and B depends on A).
+.sh AUTHOR
+Tom Duff
+.sh "SRL INFO"
+Modified by Rob Pike to take comment lines (lines beginning with a colon).
+Also, some error reporting modified to give more information.
+.sh BUGS
+Should allow a file to be dependant on a set of files, rather than
+just a single file.
+Should allow generic dependencies with some sort of pattern matching
+and replacement.
