@@ -19,7 +19,7 @@ of the distribution. Originally Warren Toomey had pointed
 out the existence of the _Qed_
 files in the `boulder/caltech/q` directory, apparently overlooking
 the fact that the parent directory is the top-level of a complete _Qed_
-distribution. Until now, the files in this part of the `qed-archive`
+distribution. Previously, the files in this part of the `qed-archive`
 were simply the contents of `./q`.
 
 Highlights
@@ -68,4 +68,8 @@ object files and directories mentioned in Rob's `read.me`:
 
 These were intended as a binary distribution for Version 6 Unix, and
 would have been generated from the included sources.
+
+#### Last Updated
+
+Thu Oct 24 21:11:41 IDT 2024
 
