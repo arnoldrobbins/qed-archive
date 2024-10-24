@@ -1,0 +1,32 @@
+.th PROMPT I 21/Dec/1977
+.sh NAME
+prompt \*- sets personal default for editor prompting
+.sh SYNOPSIS
+.bd prompt
+[
+.bd y
+]
+[
+.bd n
+]
+.sh DESCRIPTION
+\fIPrompt\fP sets the user's own personal default for editor
+prompting.
+The argument \fIy\fP gives prompting on,
+\fIn\fP gives prompting off,
+and no argument at all prints the current setting.
+.s3
+The initial setting for a new user \fIshould\fP be \fIy\fP.
+.s3
+The settings are recorded in the \fI/etc/prompt\fP file,
+which has one line per userid (userid number \fIn\fP is line \fIn\fP+1),
+with each line a single character.
+The character is \fIy\fP (for setting \fIy\fP) or n (for setting \fIn\fP).
+.sh FILES
+/etc/prompt
+.sh "SEE ALSO"
+ed(I)
+.sh "U OF T INFO"
+Written at U of T by Henry Spencer.
+.sh BUGS
+Should really check the file to make sure the format is correct.

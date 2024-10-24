@@ -1,0 +1,1082 @@
+.th ED I "1979 May 21"
+.if t .ds q \(aa
+.if n .ds q '
+.sh NAME
+ed \*- text editor
+.sh SYNOPSIS
+.bd ed
+[
+.bd \*-
+] [
+.bd \*-q
+] [ file ]
+.sh DESCRIPTION
+.it Ed
+is the standard text editor.
+.s3
+If a
+.it file
+argument is given,
+.it ed
+simulates an
+.it e
+command (see below) on the named file; that is to say,
+the file is read into
+.it ed's
+buffer so that it can be edited.
+The optional
+.bd \*-
+puts
+.it ed
+in non-\c
+.it prompting
+and non-\c
+.it verbose
+modes (described with the
+.it o
+command).
+Quit signals are ignored unless the
+.bd \*-q
+flag is used.
+.s3
+.it Ed
+operates on a copy of any file it is editing; changes made
+in the copy have no effect on the file until a \fIw\fR (write)
+or a \fIW\fR (WRITE)
+command is given.
+The copy of the text being edited resides
+in a temporary file called the
+\fIbuffer\fP.
+There is only
+one buffer.
+The buffer can contain any ASCII character except NUL.
+.s3
+Commands to
+.it ed
+have a simple and regular structure: zero or
+more
+.it addresses
+followed by a single character
+\fIcommand\fP,
+possibly
+followed by parameters to the command.
+These addresses specify one or more lines in the buffer.
+Every command which requires addresses has default addresses,
+so that the addresses can often be omitted.
+.s3
+In general, only one command may appear on a line.
+Certain commands allow the input of text for placement in the buffer.
+This text can be supplied in two forms:
+either
+on the same line, after the command,
+or on lines following the command,
+terminated by a line containing only a period `\fB.\fP'.
+If the data is on the command line,
+it is separated from the command by a space or a tab.
+If the tab is used, it is considered part of the text.
+.s3
+.it Ed
+supports a limited form of
+\fIregular\fP \fIexpression\fP
+notation.
+A regular expression specifies
+a set of strings of characters.
+A member of this set of strings is said to be
+.it matched
+by the regular expression.
+Regular expressions in
+.it ed
+are delimited by enclosing them in a pair of identical characters,
+frequently slashes `/'.
+The regular expressions allowed by
+.it ed
+are constructed as follows:
+.s3
+.lp +6 4
+1.	An ordinary character
+(not `\\', `.', `[', `*', `+', `^', `$', newline, or the delimiting character)
+is a regular expression and matches that character.
+If
+.it ed
+is in
+\fIdualcase\fP \fIsearch\fP
+mode (see the
+.it o
+command)
+a letter is matched without regard to its case.
+.s3
+.lp +6 4
+2.	A backslash `\\' followed by a special character
+(in fact, any character but
+`!', `_', `{', `}', `(', `)', or newline)
+is a regular expression and matches that special character.
+This form is used to match the delimiting character.
+.s3
+.lp +6 4
+3.	A period `\fB.\fR' matches any character except a newline.
+.s3
+.lp +6 4
+4.	The sequence `\\!' matches any control character
+except tab or newline.
+.s3
+.lp +6 4
+5.	A string of characters enclosed in square brackets
+`[\ ]' matches any character in the string but no other.
+If the string contains a minus `\*-' with a character on either side of it,
+they together match any character lexically greater than or equal to
+the first and not greater than the second.
+If, however, the first character of the string is a circumflex
+`^' the regular expression matches any character except newline
+and the characters that would otherwise be matched.
+If it is desired to include a closing square bracket in the string,
+it must be the first character, except for the optional cirumflex.
+Similarly, if it is desired to match a minus sign,
+it must either be the first or last character in the string (except for the
+optional circumflex).
+.s3
+.lp +6 4
+6.	A regular expression followed by an asterisk `*'
+matches any number of adjacent occurrences (including zero)
+of the regular expression it follows.
+The regular expression must be formed according to one of the first
+five rules.
+.s3
+.lp +6 4
+7.	A regular expression followed by a plus sign `+'
+matches one or more occurrences of the regular expression.
+The regular expression must be formed according to one of the first
+five rules.
+.s3
+.lp +6 4
+8.	The sequence `\\_' matches a non-empty
+maximal-length sequence of blanks and tabs.
+.s3
+.lp +6 4
+9.	The concatenation of regular expressions is a regular
+expression which matches the concatenation of the strings
+matched by the components of the regular expression.
+.s3
+.lp +6 4
+10.	A circumflex `^' at the beginning of a regular expression
+matches the empty string at the beginning of a line.
+At any other place in a regular expression, it matches the character `^'.
+.s3
+.lp +6 4
+11.	A currency symbol `$' at the end of a regular expression
+matches the empty string at the end of a line.
+At any other place in a regular expression, it matches the character `$'.
+.s3
+.lp +6 4
+12.	The sequence `\\{' matches the begining of an identifier,
+that is, an empty string followed by a letter or underscore `_'
+and not preceded by a letter, digit, or underscore.
+.s3
+.lp +6 4
+13.	The sequence `\\}' matches
+the end of an identifier, that is,
+an empty string preceded by a letter, digit, or underscore,
+and not followed by a letter, digit, or underscore.
+.s3
+.lp +6 4
+14.	A regular expression enclosed between
+the sequences
+`\\(' and `\\)'is identical to the
+unadorned expression; the construction has side effects discussed
+under the
+.it s
+command.
+.s3
+.lp +6 4
+15.	The null regular expression standing alone
+is equivalent to the last regular expression encountered.
+.s3
+.i0
+Regular expressions are used in addresses to specify
+lines and in one command
+(see
+.it s
+below)
+to specify a portion of a line which is to be replaced.
+.s3
+To understand addressing in
+.it ed
+it is necessary to know that at any time there is a
+\fIcurrent line.\fR
+Generally speaking, the current line is
+the last line affected by a command; however,
+the exact effect on the current line
+is discussed under the description of
+the command.
+Addresses are constructed as follows.
+.s3
+.lp +6 4
+1.	The character `\fB.\fR' addresses the current line.
+.s3
+.lp +6 4
+2.	The character `$' addresses the last line of the buffer.
+.s3
+.lp +6 4
+3.	A decimal number
+.it n
+addresses the
+\fIn\fR-th
+line of the buffer.
+.s3
+.lp +6 4
+4.	`\*q\fIx\fR' addresses the line marked with the
+mark name character \fIx\fR,
+which must be a lower-case letter.
+Lines are marked with the
+.it k
+command described below.
+.s3
+.lp +6 4
+5.	A regular expression enclosed in slashes `/' addresses
+the first matching line
+found by searching forwards from the line after the current line.
+If necessary the search wraps around to the beginning of the
+buffer.
+.s3
+.lp +6 4
+6.	A regular expression enclosed in queries `?' addresses
+the first matching line
+found by searching backwards from the line before
+the current line.
+If necessary
+the search wraps around to the end of the buffer.
+.s3
+.lp +6 4
+7.	An address followed by a plus sign `+'
+or a minus sign `\*-' followed by a decimal number specifies that address plus
+(resp. minus) the indicated number of lines.
+The plus sign may be omitted.
+.s3
+.lp +6 4
+8.	An address followed by `+' or `\*-' followed by a
+regular expression enclosed in slashes specifies the first
+matching line following (resp. preceding) that address.
+The search wraps around if necessary.
+The `+' may be omitted,
+so `0/x/' addresses the
+.it first
+line in the buffer with an `x'.
+Enclosing the regular expression in `?' reverses the search direction.
+.s3
+.lp +6 4
+9.	If an address begins with `+' or `\*-'
+the addition or subtraction is taken with respect to the current line;
+e.g. `\*-5' is understood to mean `\fB.\fR\*-5'.
+.s3
+.lp +6 4
+10.	An address followed by `+' or `\*-' not followed by an operand,
+addresses the next (resp. previous) line.
+As a consequence of this rule and rule 9,
+the address `\*-' refers to the line before the current line,
+and `\*-\*-3' refers to the current line less 4.
+.s3
+.lp +6 4
+11.	To maintain compatibility with earlier versions of the editor,
+the character `^' in addresses is entirely
+equivalent to `\*-'.
+.s3
+.i0
+Commands may require zero, one, or two addresses.
+Commands which require no addresses regard the presence
+of an address as an error.
+Commands which accept one or two addresses
+assume default addresses when none is given.
+In commands expecting two addresses, these addresses denote
+a range of lines;
+if only one address is given, the range is taken to be the
+single addressed line.
+If more addresses are given than the command requires,
+the last one or two (depending on what is accepted) are used.
+The last addressed line must not precede the second-last addressed line.
+.s3
+Typically, addresses are separated from each other by a comma `,'.
+They may instead be separated by a semicolon `;'
+in which case the current line `.' is set to the first address
+before the second address is interpreted.
+Addresses may also be separated by an asterisk `*' in which case the
+first address defaults to line one (line zero if the buffer is empty),
+and the second is interpreted as if it were prefixed with `$'.
+Thus, the address list `*' denotes the whole buffer,
+and `7*' denotes all lines from seven on.
+.s3
+Filename operands of commands may be made up of printing characters only.
+However, when the filename appears as the argument to the invocation of
+\fIed\fP,
+non-printing characters may be included.
+.s3
+In the following list of
+.it ed
+commands, the default addresses
+are shown in parentheses.
+The parentheses are not part of
+the address, but are used to show that the given addresses are
+the default.
+.s3
+As mentioned, it is generally illegal for more than one
+command to appear on a line.
+However, any command may be suffixed by `p'
+or by `l', in which case
+the current line is either
+printed or listed respectively
+in the way discussed below.
+.s3
+.lp +5 5
+( \fB. \fR)a <text>
+.lp +5 5
+	The append command accepts input text
+and appends it after the addressed line.
+`\fB.\fR' is left
+on the last line input, if there
+were any, otherwise at the addressed line.
+Address `0' is legal for this command; text is placed
+at the beginning of the buffer.
+.s3
+.lp +5 5
+( \fB. \fR)b[+-][pagesize][pl]
+.lp +5 5
+	The browse command provides page-oriented printing.
+The optional `+' or `\*-' specifies whether the next or previous
+page is to be printed; if absent, `+' is assumed.
+If a pagesize is given, it is used for the current browse
+command and remembered as the default.
+The pagesize is initially 20 lines.
+If a terminal `p' or `l' is provided,
+the lines are printed in the specified format,
+and the format is remembered as the default.
+Initially, `p' is the default.
+After a browse command, `.' is left at the last line displayed.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)c <text>
+.lp +5 5
+	The change
+command deletes the addressed lines, then accepts input
+text which replaces these lines.
+`\fB.\fR' is left at the last line input; if there were none,
+it is left at the line preceding the deleted lines.
+.s3
+.lp +5 5
+cd filename
+.br
+The change directory command changes
+\fIed\fP's
+current directory.
+The remembered filename is discarded, unless it starts with `/'.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)d
+.br
+The delete command deletes the addressed lines from the buffer.
+The line after the deleted section becomes the current line;
+if the deleted lines were at the end,
+the new last line becomes the current line.
+.s3
+.lp +5 5
+e filename
+.br
+The edit
+command causes the entire contents of the buffer to be deleted,
+and then the named file to be read in.
+`\fB.\fR' is set to the last line of the buffer.
+The number of characters read is typed
+if
+.it ed
+is in
+.it verbose
+mode.
+The \fIfilename\fP is remembered for possible use as a default file name
+in a subsequent
+\fIr\fR, \fIw\fR, or \fIW\fR command.
+.s3
+.lp +5 5
+f filename
+.br
+The filename command prints the currently remembered file name.
+If \fIfilename\fP is given,
+the currently remembered file name is changed to \fIfilename\fP.
+.s3
+.lp +5 5
+(1,$)g/regular expression/command list
+.br
+In the global
+command, the first step is to mark every line in the range which matches
+the regular expression.
+Then for every such line, the
+command list is executed with `\fB.\fR' initially set to that line.
+A single command or the first of multiple commands
+appears on the same line as the global command.
+All lines except the last must end with
+a sequence of backslashes `\\' followed by a newline.
+One of these backslashes is discarded.
+The
+\fIa\fP,
+\fIi\fP,
+and
+.it c
+commands and associated input are permitted;
+the `\fB.\fR' terminating input mode may be omitted if it would be on the
+last line of the command list.
+The
+.it x
+command's input comes from the terminal, not the command list.
+The (global) commands,
+\fIg\fP,
+and
+\fIv\fP,
+are not permitted in the command list.
+If the command list is empty, `.p' is assumed.
+The regular expression may be delimited by any character other than newline.
+.s3
+.lp +5 5
+( \fB. \fR)i <text>
+.lp +5 5
+	The insert command accepts input text
+and inserts it before the addressed line.
+`\fB.\fR' is left at the last line input; if there were none,
+at the line before the addressed line.
+This command differs from the
+.it a
+command only in the placement of the
+text.
+.s3
+.lp +5 5
+( \fB. \fR, \fB.+1 \fR)j         or,
+.lp +5 5
+( \fB. \fR, \fB.+1 \fR)j/replacement/
+.br
+The join command collapses all addressed lines into one by
+deleting the newline of each line but the last.
+The
+.it replacement
+(if any) is placed between joined lines,
+replacing newline characters.
+Newlines, backslashes `\\', and slashes `/' within
+.it replacement
+must be preceded by a backslash, which will be discarded.
+The sequence `\\n' denotes a literal newline.
+Note that only slashes may delimit
+\fIreplacement\fP.
+`\fB.\fP' is left at the (last) resulting line.
+.s3
+.lp +5 5
+( \fB. \fR)k\fIx\fR
+.br
+The mark command marks the addressed line with
+name
+\fIx\fP,
+which must be a lower-case letter.
+The address form `\*q\fIx\fR'
+(apostrophe followed by
+.it x)
+then addresses this line.
+`.' is not changed.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)l
+.br
+The list command
+prints the addressed lines in an unambiguous way:
+a tab is printed as `\\t', a backspace as `\\b',
+a non-printing character is
+printed as a backslash followed by three octal digits,
+and a long line is folded,
+with the second and subsequent sub-lines indented one tab stop.
+If the last character in the line is a blank,
+it is followed by `\\n'.
+An
+.it l
+command may follow most others
+(all except
+\fIcd\fP, \fIe\fP, \fIf\fP, \fIl\fP, \fIp\fP, \fIr\fP, \fIw\fP, \fIW\fP,
+and the null command)
+on the same line.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)m\fIa\fR
+.br
+The move command repositions the addressed lines after the line
+addressed by
+\fIa\fP.
+The last of the moved lines becomes the current line.
+.s3
+.lp +5 5
+o\fIps\fP
+.br
+The option command allows various options to be set.
+The letter \fIp\fP
+specifies which option is being set.
+The rest of the command, \fIs\fP,
+specifies the setting.
+Most options can be either enabled or disabled;
+\fIs\fP is `s' to set the option,
+or `r' to reset it.
+The following table describes the available options.
+The default setting is shown after the option's letter.
+.s3
+.lp +12 5
+dr	Dualcase search mode
+affects rule one of regular expression construction
+so that a letter is matched without regard to its case.
+.s3
+.lp +12 5
+nr	Noisy mode causes the
+.it s
+command (outside of global commands)
+and the
+.it x
+command to act as if they were suffixed with `p'.
+.s3
+.lp +12 5
+ps	Prompting mode causes `*' to be printed
+immediately before a command (as opposed to text)
+is read.
+Prompting can be reset by the use of a flag when invoking
+\fIed\fP.
+.s3
+.lp +12 5
+t	The terminal option specifies terminal characteristics
+for the
+.it x
+command.
+The first letter of \fIs\fP specifies the terminal type:
+`d' for dualcase,
+`m' for monocase,
+`c' for correspondence 2741, and
+`e' for EBCD 2741.
+The next two characters of \fIs\fP,
+if present, specify the ERASE and KILL characters
+(see tty(VI)).
+If the standard input is an ordinary terminal
+this option is automatically set correctly during initialization.
+.s3
+.lp +12 5
+vs	Verbose mode causes character counts to be printed
+after
+\fIe\fP,
+\fIr\fP,
+\fIw\fP,
+and
+.it W
+commands.
+It also causes `!' to be printed upon completion of the ! command.
+The verbose mode may be reset by the use of a flag when invoking
+\fIed\fP.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)p
+.br
+The print command prints the addressed lines on the standard output
+(usually the user's terminal).
+`\fB.\fR'
+is left at the last line printed.
+The
+.it p
+command may be placed on the same line after most commands
+(all except
+\fIcd\fP, \fIe\fP, \fIf\fP, \fIl\fP, \fIp\fP, \fIr\fP, \fIw\fP, \fIW\fP,
+and the null command)
+.lp +5 5
+.s3
+q
+.br
+The quit command causes
+.it ed
+to exit.
+No automatic write
+of a file is done.
+.s3
+.lp +5 5
+($)r filename
+.br
+The read command
+reads in the given file after the addressed line.
+If no file name is given,
+the remembered file name, if any, is used
+(see
+.it e
+and
+.it f
+commands).
+The remembered file name is not changed unless
+`filename' is the very first file name
+mentioned.
+Address `0' is legal for
+.it r
+and causes the
+file to be read at the beginning of the buffer.
+If
+.it ed
+is in
+.it verbose
+mode and the read is successful, the number of characters
+read is typed.
+`\fB.\fR' is left at the last line read in from the file.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)s\fIn\fR/regular expression/replacement/         or,
+.lp +5 5
+( \fB. \fR, \fB. \fR)s\fIn\fR/regular expression/replacement/g
+.br
+The substitute command searches each addressed
+line for occurrences of the specified regular expression.
+The decimal number \fIn\fP defaults to 1 if missing.
+On each line in which
+.it n
+matches are found,
+the \fIn\fPth matched string is replaced with
+\fIreplacement\fP.
+If the global replacement indicator `g' follows the command,
+all subsequent matches on the line are also replaced.
+Within a line, a search starts from the character following the last match,
+unless the last match was an empty string,
+in which case the search starts at
+the second character following the empty string
+(to ensure a match is not repeated).
+It is an error for the substitution to fail on all addressed lines.
+Any character other than newline or a numeral
+may be used instead of `/' to delimit the regular expression
+and \fIreplacement\fP.
+`\fB.\fR' is left at the last line substituted.
+.s2
+An ampersand `&' appearing in \fIreplacement\fP
+is replaced by the string matching the regular expression.
+As a more general feature,
+the characters
+`\\\fIn\fR',
+where
+.it n
+is a digit,
+are replaced by the text matched by the
+\fIn\fR-th
+regular subexpression
+enclosed between `\\(' and `\\)'.
+When
+nested, parenthesized subexpressions
+are present,
+.it n
+is determined by counting occurrences of `\\(' starting from the left.
+.s2
+To include an ampersand `&', backslash `\\', newline,
+or the delimiter (unless it is the letter `n') literally in
+\fIreplacement\fP,
+the character must be preceded by a backslash.
+Lines may be split by substituting newline characters into them.
+The sequence `\\n' is equivalent to backslash followed by newline.
+.s3
+.lp +5 5
+( \fB.\fR , \fB.\fR )t\fIa\fR
+.br
+This command makes a copy of the addressed lines,
+and appends it after the line addressed by \fIa\fR
+(which may be 0).
+`\fB.\fR' is left on the last line of the copy.
+.s3
+.lp +5 5
+u
+.br
+The undo command restores the last line changed by a
+\fIs\fP,
+\fIu\fP,
+or
+.it x
+command.
+Any new lines created by splitting the original are left.
+`\fB.\fP' is left at the restored line.
+.s3
+.lp +5 5
+(1,$)v/regular expression/command list
+.br
+This command is the same as the global command
+except that the command list is executed
+with `\fB.\fR' initially set to every line
+.it except
+those
+matching the regular expression.
+.s3
+.lp +5 5
+(\fB1\fR,\fB$\fR)w filename
+.br
+The write command writes the addressed lines onto
+the given file.
+If the file does not exist,
+it is created mode rw-rw-rw- (readable and writable by everyone).
+The remembered file name is
+.it not
+changed unless
+\fIfilename\fP is the very first file name mentioned.
+If no file name is given,
+the remembered file name, if any, is used
+(see
+.it e
+and
+.it f
+commands).
+`\fB.\fR' is unchanged.
+If
+.it ed
+is in
+.it verbose
+mode and
+the command is successful, the number of characters written is
+typed.
+If the buffer is empty,
+no write is attempted.
+.s3
+.lp +5 5
+(\fB1\fR,\fB$\fR)W
+.br
+The WRITE command is similar to, but more imperative than, the write command.
+Unlike the write command, it will WRITE an empty file if the buffer is empty.
+.s3
+.lp +5 5
+( \fB. \fR, \fB. \fR)x
+.br
+The xform command allows one line at a time to be modified according to
+graphical requests.
+The line to be modified is typed out,
+and then the modify request is read from the terminal
+(even if the xform command is in a global command).
+Generally each character in the request specifies how to
+modify the character immediately above it, in the original line,
+as described in the following table.
+.s3
+.lp +11 4
+#	Delete above character.
+.s3
+.lp +11 4
+%	Replace above character with space.
+.s3
+.lp +11 4
+^	Insert the rest of the request line before the above character.
+If the rest of the request line is empty, insert a newline character.
+.s3
+.lp +11 4
+$	Delete the characters in the above line from this position on;
+replace them with the rest of the request line.
+.s3
+.lp +11 4
+space or tab: Leave above character(s) unchanged.
+.s3
+.lp +11 4
+any other: This character replaces the one above it.
+.s3
+.lp +5 5
+	If the request line is longer than the line to be modified,
+the overhang is added to the end of the line
+without interpretation,
+that is, without treating the special characters specially.
+Any characters after a `^' or `$' request are not interpreted either.
+.s3
+To make xforming match how the line appears on the terminal,
+the processor must know the terminal type.
+For example, on monocase terminals, the character `{' takes
+two positions.
+For a description of how the terminal type is set, see the
+.it t
+option of the
+.it o
+command.
+.s3
+If a character has no width, or a negative width,
+the modification would be confusing.
+For this reason, xform will not process control characters other
+than tab and newline,
+except in contexts where it need not know their width
+(that is, after a `^' or `$' request, or in the part of
+either the request or the line that overhangs the other).
+Remember that the ERASE character (processed by the system)
+erases the last character typed,
+not the last column.
+.s3
+Some characters take more than one column of the terminal
+to enter or display.
+For example, entering the ERASE or KILL characters literally
+takes two columns because they must be escaped.
+To delete a multi-column character,
+one must type `#' under all its columns.
+To replace a multicolumn character,
+the replacement must be typed under the first column of the character.
+Similarly, if a replacement character is multi-columned,
+it replaces the character in its first column.
+.s3
+The tab character prints as a sequence of spaces, and may be
+modified as if it were that sequence.
+As long as the last space is unmodified, it and the
+remaining contiguous spaces will represent a tab.
+.s3
+Usually all the modifications desired can be specified by one request.
+This is not necessarily the case when a `^' request is used,
+since no modifications can be made to the line beyond the point of
+the `^'.
+For this reason, whenever a request contains an interpreted `^',
+the modification process is repeated after the request has been processed.
+If the
+.it x
+command had a
+.it p
+suffix,
+the modification process is repeated until the request is empty
+even if there was no `^' request.
+Note that this suffix allows one to see the line in its final form.
+The
+.it l
+suffix is synonymous with the
+.it p
+suffix when used with the \fIx\fR command:
+it does not cause control characters to be printed.
+.s3
+.lp +5 5
+(\fB$\fR)=
+.br
+The line number of the addressed line is typed.
+`\fB.\fR' is unchanged by this command.
+.s3
+.lp +5 5
+!UNIX command
+.br
+The remainder of the line after the `!' is sent
+to the UNIX shell(I) to be interpreted as a command.
+Within this command, the sequence `$1' stands for
+the remembered filename.
+(In other versions of the shell, $2 may replace $1,
+or the feature may not exist.)  \&
+If a range of lines is specified, they become the
+default standard input of the command;
+otherwise, the default standard input is the same as \fIed\fP's.
+The signals INTR, QUIT, and HUP are enabled or disabled
+as on entry to
+\fIed\fP.
+At the completion of the command,
+if
+.it ed
+is in
+.it verbose
+mode, an `!' is printed.
+`\fB.\fR' is unchanged.
+.s3
+.lp +5 5
+( \fB.\fR+1, \fB.\fR+1 )<newline>
+.br
+An address or addresses alone on a line
+cause the addressed lines to be printed.
+A blank line alone is equivalent to `.+1p'; it is useful
+for stepping through text.
+If the last address separator before the newline was `;',
+only the final addressed line is printed.
+.s3
+.i0
+If an interrupt signal (ASCII DEL) is sent,
+.it ed
+prints `??' and returns to its command level.
+If a hangup signal is received and the buffer is not empty,
+the buffer is written to a file named \fIed.hup\fP.
+The last filename field of <remembered filename> is truncated to
+13 characters to ensure the original file is not overwritten.
+.s3
+If an error occurs during command processing,
+.it ed
+returns an error (when it exits) code which is the ASCII code of the last error encountered.
+If no errors occur, the return code is zero.
+.s3
+Some size limitations:
+512 characters per line,
+256 characters per global command list,
+64 characters per file name,
+and 128K characters in the temporary file.
+The limit on the number of lines depends on the amount of core:
+each line takes 1 word.
+.sh FILES
+/tmp/e#, temporary;
+`#' is the process number (six decimal digits).
+.sh DIAGNOSTICS
+Diagnostics are in the form of `?' followed by a single letter code
+(except that `?o' is followed by the offending file name):
+.s3
+.lp +4 3
+a	address syntax
+.lp +4 3
+b	bad x command data or terminal type unknown
+.lp +4 3
+c	ran out of core
+.lp +4 3
+d	bad directory name in \fIcd\fP command
+.lp +4 3
+f	filename syntax error
+.lp +4 3
+g	tried to nest global commands
+.lp +4 3
+i	unknown flag or too many args
+.lp +4 3
+k	illegal argument to 'k' command
+.lp +4 3
+l	an internal table length was exceeded
+.lp +4 3
+m	tried to move to an illegal place [e.g. 1,6m4]
+.lp +4 3
+n	last line of input did not end with newline
+.lp +4 3
+o	error opening or creating a file
+.lp +4 3
+p	pattern syntax
+.lp +4 3
+r	error reading a file
+.lp +4 3
+s	no substitutions found
+.lp +4 3
+T	I/O error or overflow in tempfile
+.lp +4 3
+u	no line for u command to undo
+.lp +4 3
+w	error writing a file
+.lp +4 3
+x	command syntax error
+.lp +4 3
+?	interrupt
+.lp +4 3
+$	line address out of range
+.lp +4 3
+/	line search failed
+.lp +4 3
+!	jackpot -- you found a bug in regular expression matching.
+.i0
+.s3
+.sh "SEE ALSO"
+A Tutorial Introduction to the ED Text Editor
+(B. W. Kernighan)
+.sh "U of T INFO"
+Tom Duff:
+.lp +6 4
+1.	Added
+.it n
+to the substitute command.
+.lp +6 4
+2.	Added address separators `&' and `*'.
+.lp +6 4
+.lp +6 4
+3.	In error messages, added the letter indicating the type of error.
+.lp +6 4
+4.	Added the option command, and the
+\fId\fP,
+\fIp\fP,
+\fIv\fP,
+and
+.it &
+options.
+.i0
+.s3
+Rob Pike:
+.lp +6 4
+1.	Added hangup signal catching.
+.lp +6 4
+2.	Added regular expressions `\\{' and `\\}'.
+.lp +6 4
+3.	Made the
+.it l
+command print DEL correctly.
+.lp +6 4
+4.	Fixed a bug which caused marks placed on the first line
+entered to be transfered to line zero.
+Fixed a bug in `;' processing.
+.lp +6 4
+5.	Added the
+.it b
+command and deleted the `&' address operator.
+.lp +6 4
+6.	Made `P' a synonym for `p'.
+.lp +6 4
+7.	Changed the `o' error to print the file name, and made i/o errors
+cause `r' and `w' messages.
+.lp +6 4
+8.	Made the return code sensible.
+.lp +6 4
+9.	Changed the file creation mode from 0644 back to 0666
+.lp +6 4
+10.	Changed the `+' regular expression operator from `\\+'.
+.lp +6 4
+11.	Changed the format of lines printed by `l'.
+.lp +6 4
+12.	Changed the hangup file name to `ed.hup'.
+.i0
+.s3
+Henry Spencer:
+.lp +6 4
+1.	Allowed each user to set his prompt default (see prompt(I)).
+	(Not implemented at SRL.)
+.lp +6 4
+2.	Made
+.it ed
+create files writable only by the owner.
+(Undone by Rob Pike).
+.i0
+.s3
+Hugh Redelmeier:
+.lp +6 4
+1.	Made the
+.it s
+command preserve marks; made the
+.it e
+command delete them.
+.lp +6 4
+2.	Made non-printing characters illegal in filenames; made the syntax of
+a filename be validated before the remembered filename is replaced,
+and before the
+.it e
+command deletes the buffer.
+.lp +6 4
+3.	Made several changes to make sure that interrupt and hangup signals
+leave the buffer in a valid state.
+.lp +6 4
+4.	Added the
+\fIcd\fP, \fIj\fP, \fIu\fP, \fIW\fP,
+and
+.it x
+commands;
+added the
+.it n
+and
+.it t
+options.
+.lp +6 4
+5.	Added the <address>+/regular expression/ etc. addressing.
+Generalized the defaulting of the right operand of `+' and `\-'.
+Modified the meanings of `&' and `$'.
+.lp +6 4
+6.	Added `\\_', `\\!', and `\\+' regular expressions.
+Also added ranges to character class regular expressions.
+.lp +6 4
+7.	Fixed several bugs in addressing,
+pattern matching,
+substituting,
+global command processing,
+terminal input,
+and error handling.
+.lp +6 4
+8.	Added I/O error detection and `n' error detection.
+Changed the diagnostic for tempfile errors.
+.lp +6 4
+9.	Made an empty command list in global command equivalent to `.p'.
+Made the null command (that is, the command with no verb)
+print a range of lines unless the last address separator is `;'.
+.lp +6 4
+10.	Added ``immediate'' mode of text input for
+\fIa\fP, \fIc\fP,
+and
+.it i
+commands.
+.lp +6 4
+11.	Made `\\n' stand for newline in replacement part of substitute
+and join commands.
+.lp +6 4
+12.	Made the ! command accept a range of lines.
+Added a parameter to the shell invocation to make $2 stand for
+the remembered file name.
+Made this command reflect
+.it verbose
+mode.
+.lp +6 4
+13.	Integrated the description of local changes into this manual section.
+.i0

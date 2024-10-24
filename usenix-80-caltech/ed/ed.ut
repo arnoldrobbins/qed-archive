@@ -1,0 +1,181 @@
+j.po 10
+.ll 80
+.de np
+'sp 2
+.tl ''-%-''
+'sp 2
+..
+.wh -5 np
+Here is a list of the functional enhancements made at the University of
+Toronto to the Version 6 editor.
+Some, but not many, of these changes are in Version 7 ed.
+A full description may be found in the manual section for ed, ED(I).
+.in +8
+.sp
+.ti 0
+Errors:
+.sp
+.ti -4
+A brief indication of the error
+appears after the query `?'.
+Errors produce a single character error code,
+such as `?/' for failed context search, `?s' for failed substitution,
+etc.
+If the error was an inaccessible file,
+the file name is printed after the usual error message.
+The full list of error codes is in the back of ED(I).
+.sp
+.ti 0
+Addresses:
+.sp
+.ti -4
+`*' simplifies buffer addressing.
+It is simple: <addr1>*<addr2>
+defaults the <addr1> to line 1 and interprets <addr2> as if
+it were prefixed with `$'.
+Thus, `*' addresses the whole buffer and `7*' addresses lines
+7 through to the end.
+As a result of the next listed modification, `*'
+by itself is a particularly brief
+and handy way of displaying all the text in the buffer.
+.sp
+.ti -4
+If no command is given, the default is to print the addressed lines.
+Thus, the command `1,7' prints the first 7 lines, and `*'
+prints the entire buffer.
+.sp
+.ti -4
+<address>+/RE/ and <address>-/RE/ are interpreted as the first
+(resp. first previous) line, relative to <address>, which
+match the regular expression RE.
+Thus, `-/RE/' is the same as `?RE?'.
+If no separator appears between addresses, `+' is assumed.
+Therefore, `5/xxx/' is similar to `5;/xxx/' except that
+it is only one address (c.f. `5/xxx/, $?yyy? p').
+.sp
+.ti 0
+Regular expressions
+.sp
+.ti -4
+The sequence `\\_' matches a maximal length sequence of blanks and
+tabs (white space).
+.sp
+.ti -4
+The sequence `\\!' matches any control character except tab or newline.
+.sp
+.ti -4
+The closure operator `+' (or `\\+' on some versions)
+is similar to `*', but guarantees at least one match.
+For example, `a*' matches zero or more `a's, but
+`a+' matches one or more.
+Generally, `+' is more useful (or at least, less error prone)
+than `*'.
+.sp
+.ti -4
+Ranges are supported in character classes: `[0-9]' means `[0123456789]'.
+.sp
+.ti -4
+The escaped braces `\\{' and `\\}' match the empty strings at the
+beginning and end of an identifier (in C).
+Therefore, `\\{a\\}' matches the English word `a',
+sequences such as `a++' and `a->x', but not `abb++'.
+The interpretation of these metacharacters is described in greater
+detail in the manual.
+.sp
+.ti 0
+New commands
+.sp
+.ti -4
+The option `o' command allows many flags and parameters to be
+set.
+Common options set things like automatic prompting for commands
+and automatic printing after substitutions,
+which are helpful for beginning users.
+The full set of options is described in the manual.
+.sp
+.ti -4
+The browse `b' command simplifies page-at-a-time printing.
+Its general form is b[+-][N][pl].
+The `+' or `-' specifies whether the next or previous page
+is to be displayed; `+' is assumed if omitted.
+If N is specified, the page size is set (and remembered)
+before the printing is done.
+N is initially 20.
+The `p' or `l' sets the format for printing the lines.
+The usual forms of the browse command are just `b'
+(print next page) and `b-' (print previous page).
+.sp
+.ti -4
+The substitute command accepts a number after the `s' to specify
+which occurrence is to be changed.  For example,
+`s3/x/y/p' substitutes the third `x' on the line,
+and `s3/x/y/gp' substitutes the third, fourth, ..., to the last.
+Also, the sequence `\\n' in the right hand side of a substitute
+(the replacement text) represents an escaped newline.
+.sp
+.ti -4
+The `cd <dir>' commands changes the current working directory of Ed.
+The file name is thrown away if it does not begin with `/'.
+DANGER: upon emerging from Ed after a `cd' command has been done,
+the shell will be in the directory it was in when Ed was invoked.
+.sp
+.ti -4
+The join (`j') command joins two or more adjacent
+lines of text.
+The default addressing is to join the current line to the next line
+(i.e. `.,.+1j'), but
+any range of addresses may be specified.
+If the command is given a replacement text, as in `j/xxx/',
+the lines are joined with the replacement separating them.
+.sp
+.ti -4
+The undo `u' command undoes the last previous `s', `u' or `x' command.
+Useful for fixing mistakes.
+.sp
+.ti -4
+The transform (`x') command performs in-line character substitution.
+Its use is simple but difficult to describe in text;
+see the manual.
+.sp
+.ti -4
+If the `!' command is given a range of lines, those lines
+are sent as standard input to the specified command.
+Handy when coupled to the `args' shell command.
+.sp
+.ti -4
+The append commands `a', `i' and `c' can optionally take a single
+line of text on the same input line as the command, as in
+.br
+a A single line of text.
+.br
+The line is appended according to the command given,
+and Ed is immediately ready for another command.  No terminating
+period is required.
+If the first character after the `a', `i' or `c' is
+a space, it is thrown away.
+If it is a tab (the only other possibility), it is kept.
+.sp
+.ti 0
+Miscellany
+.sp
+.ti -4
+When Ed receives a hangup signal, such as when someone trips over the
+phone,
+the contents of the buffer are saved in a file called
+ed.hup, so that work is not lost.
+.sp
+.ti -4
+File names (except when specified at initialization) may not
+contain control characters; an error is signalled if they do.
+.sp
+.ti -4
+An empty command list in a global is equivalent to `.p'.
+.sp
+.ti -4
+`l' format has been changed:
+tabs and backspaces appear as \t and \b,
+control characters as \nnn where the n's are octal digits,
+long lines are folded with the second and subsequent sub-lines
+indented a tab stop,
+and if the last character on the line is a space,
+it is followed by the sequence \n

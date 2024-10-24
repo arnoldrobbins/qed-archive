@@ -1,0 +1,124 @@
+This is the latest version of qed.
+Since it has been worked on very recently,
+this version is different from the version
+distributed by David Tilbrook (with his T.I.P.S. system);
+his is older and uglier.
+You will find the following directories:
+	.	source for qed.
+	q	handy qed buffers & their support code
+	ed	source for ed and grep
+	support	source for miscellany: make (not the v7 one), qedbufs, etc.
+	bin	v6 executables for everything
+	doc	manual sections and the qed tutorial
+	objectfiles *.o for qed; ./lib is a version 7 archive
+Version 7 binaries could not be obtained at distribution time;
+our system was down.
+Unfortunately, that may mean that some of the programs won't compile,
+but I doubt it.
+
+Manual sections should run through either nroff or troff.
+To run off the tutorial: just [tn]roff doc/tutorial
+
+Code:  I think ed will compile under v6 compiler.  I am sure nothing else
+will.  Sorry, but we have the typesetting distribution here and it is
+nice to use the new language features!  The support routines use
+stdio, but that is easy to undo if you don't have it.  I don't think
+qed uses any library functions other than system calls.
+It would certainly be possible to make the qed source operable
+under a v6 system, but with v7 released now, the task of conversion
+didn't seem worth the effort for me.  (I'm selfish.)  In fact,
+I increased the dependency on the version 7 compiler.
+The library (./lib) is a v7 library; the object modules will,
+I hope, be useful from either version (on a PDP-11).  Good luck.
+The paragraphing styles reflect the differing opinions of qed's
+four architects; although paragraphed inconsistently,
+(primarily with respect to the placement of blanks),
+the general style is fairly consistent.
+There are a few #defines you can set for various purposes.
+#define V7 if you have a version 7 system;
+#define PDP11 if you have a PDP11;
+#define PROMPTING (ed only) if you want ed to read the default prompting
+file on a per-user basis (bleah!).
+#define S2741 (ed only) if you have the U of T 2741 terminal support.
+Finally, the code was fluctutating while this distribution was
+being built, so the code is probably buggy.  Sorry.
+Please tell me (address below) if you find bugs.
+
+Features: You may want to put some of the qed features into ed,
+but don't get carried away.  The two editors should be quite different.
+Qed is for hacks.  Something that we are planning to put into ed
+is the line-numbered (and mark-labeled) print commands, P and L.
+In qed, it would be nice if internal forms used for numerical registers
+during calculation were long integers, but I haven't needed the
+larger integers yet, so I haven't done the work.  The b[+-]
+(browse) command needs some work, but we can't decide on a good
+solution.  It would be nice to be able to do things like back up
+a page (i.e. address like .-pagesize) and things like that,
+so if you come up with a good solution, let me know.  I have
+left the browse command as 'b' even in qed, as one can
+syntactically distinguish the two forms if there is a + or - present.
+I admit, though, that it is a little sleazy.  I have left it as is
+for compatibility with ed.  Some qed users claim the command should
+be a colon `:'; you decide.
+
+Advances:  Some of the code in qed, being a direct descendant from
+ed, will revile you.  These problems will go away at some point,
+but probably under the cover of a complete rewrite, through which
+qed will change completely.  Even the name will change.  In the meantime,
+if you're looking for a one day hack, try the following:
+	- All the pointers for all the buffers are kept in core,
+	  and must be shuffled after an append.  Two solutions come
+	  to mind: relativizing the pointers to their `zero' when
+	  leaving a buffer, and restoring them when chngbuf'ing back;
+	  or moving the non-used pointers to disk.  The latter solution
+	  is more satisfactory (it means you can edit several huge files),
+	  but is much more work.  The former solution could be done in a day.
+	- If you type `qed *.c' it takes a while to start.  You could just
+	  load the file names and not do the read until you actually need
+	  the contents (as in when you chngbuf to the empty buffer).  I think
+	  it's an easy thing to do if you give the cflag for each buffer
+	  a special value if it needs to be loaded.  Watch that n must
+	  print out something like a query `?' for $ in each unloaded
+	  buffer; otherwise G may foul up.  Exactly how everything
+	  should interact under this scheme I don't know, but it seems
+	  like a worthwhile hack.
+
+Installation:  First, install the binaries in /bin.
+Many of the commands can comfortably live in /usr/bin,
+but the editors should be in /bin, and probably sticky-bitted
+if you have lots of swap space.
+Next, copy support/etcqedfile to /etc/qedfile.  It is a null file
+(i.e. has no files defined) for 128 user id's.  Then, users can
+run qedfile to set up their default initialization buffer.
+Next, make a directory /usr/qed and /usr/qed/q.
+Copy q/* to qed/q, but put q/qfile into /usr/qed/qfile.
+The qfile is a suitable startup buffer for general use (it's my
+default).  They're all pretty obvious except for zr.
+zr runs an off-line (i.e. in the file system) buffer.
+\zr command args
+sets two string registers to the command name and arguments
+(through the use of the buffer /usr/qed/q/run), and calls the
+command /usr/qed/q/command.q.
+The command \zr man
+will show what's available.
+The register zq contains the directory where buffers are located;
+it may be changed (in the qfile or inside qed) if the buffers
+are elsewhere.
+
+Support and commands:  Make is Tom Duff's v6 version.  Although less fancy
+than the v7 one, some of us find it actually superior in usability.
+Anyway, the makefile here is driven by Tom's version; you can change it
+if desired.  com is a simple compiler-driver that allows compiling
+information to be kept in the source file.  The source files mostly
+use it, but need not do so.
+Some of the other commands are icing:
+args converts lists into arguments to a command
+c columnates a list of files
+pick is a tty-input driver for args; `pick * | args rm' is like dsw.
+
+If you get qed running, I'd appreciate hearing how you do with it.
+And, of course, if there are problems...
+
+				Rob Pike
+				Caltech 356-48
+				Pasadena, CA 91106

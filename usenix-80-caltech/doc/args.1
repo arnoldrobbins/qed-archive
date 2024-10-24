@@ -1,0 +1,26 @@
+.th ARGS I Nov/76
+.sh NAME
+args \*- copy standard input to argument list and execute
+.sh SYNOPSIS
+args ...
+.sh DESCRIPTION
+Args creates an argument list from its argument list and the lines of its standard
+input.
+Using that argument list it tries to execute a command.
+It knows about commands in /bin or /usr/bin, and about command files.
+.ti+5
+For example,
+	find . -type b -a -print | args ls -l
+.br
+will list all the block special files under your
+current working directory.
+.sh "SEE ALSO"
+pick (I) -- a useful adjunct to args
+.sh DIAGNOSTICS
+Can't exec -- If the programme cannot be found.
+.br
+Too many args -- UNIX has a limit of 512 characters in an argument list.
+.sh "U of T INFO"
+Written at the University of Toronto by
+Tom Duff.
+.sh BUGS

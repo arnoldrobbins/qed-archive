@@ -1,0 +1,50 @@
+.th "QEDBUFS" "I" "79 06 08"
+.sh NAME
+qedbufs \*- output qed saved structures
+.sh SYNOPSIS
+.it qedbufs
+[ -n% ] [ prefix ... ]
+.sh DESCRIPTION
+.it Qedbufs
+is used to examine the contents of a Qed(I) "save" file.
+.s3
+The Qed "Sv" command dumps the contents of all buffers
+into a file called "X:aq" where `X' is supplied as part
+of the "Sv" command, or defaulted to `q'.
+It also dumps all the buffer controls (i.e. the zero, dot & dollar)
+and the register contents
+into a file called "X:bq".
+.s3
+.it Qedbufs
+outputs some or all of the contents of the "X:bq" file
+where `X' is the argument
+.it prefix
+(default `q').
+.s3
+The meanings of the flags are:
+.s3
+.lp +5 5
+-	Equivalent to "-n%". See below.
+.s3
+.lp +5 5
+-n	print the dot, dollar, cflag, and filename
+for the buffers.
+.s3
+.lp +5 5
+-%	print the values of the registers.
+.i0
+.s3
+The default flag is "-n".
+The "-%" flag suppresses
+the "-n" flag, unless explicitly given.
+.sh "SEE ALSO"
+qed(I), qedfile(I)
+.sh FILES
+*:bq
+.sh DIAGNOSTICS
+.sh "U of T INFO"
+Written at BNSR by
+David Tilbrook
+.sh BUGS
+Depends critically on defined constants in Qed,
+so if Qed changes Qedbufs may not work.

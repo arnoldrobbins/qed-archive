@@ -25,8 +25,9 @@ own `README.md` file.
 
 * `multics`: What seems to be the last version of QED for MULTICS.
 
-* `usenix-80-caltech`: QED scripts from a 1980 USENIX software
-distribution tape.
+* `usenix-80-caltech`: A complete set of QED sources from a 1980 USENIX software
+distribution tape, including support programs, documentation, and the University
+of Toronto enchanced ED editor.
 
 * `unix-1985`: My tarball from 1987. The files therein have dates
 in April 1985.
