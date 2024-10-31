@@ -1,0 +1,141 @@
+Thu Oct 31 07:06:52 PM IST 2024
+===============================
+
+The following text was forwarded to me by Clem Cole. It's included
+here by permission from Paul and Tom.
+
+Arnold Robbins
+-------------------------------------------
+From Paul Green, October 29, 2024:
+
+Hi Clem (and Tom),
+
+Clem, you asked whether the source code for “QED”, as archived at
+https://github.com/arnoldrobbins/qed-archive, accurately represents
+Multics source code. Also, by implication, whether this is an
+implementation of QED or some closely-related editor.
+
+The first question is easy to answer. Yes, this is Multics source code.
+I know of Charles Anthony, and I’m pretty sure that I know the origins of
+this source code.  Tom Van Vleck (cc’d) performed the herculean task of
+prying the source code for Multics out of Bull in France, who ended up as
+the last holder of the rights to the code. Tom and I both worked on Multics
+for Honeywell Information Systems in Cambridge (MA) and our names or
+initials are all over the source code.  Please visit
+https://web.mit.edu/multics-history/ for more information on the Multics
+source code.
+
+Charles Anthony and several others wrote an emulator for the Multics
+hardware which has been operational for several years, and that team
+continues to enhance and maintain a version of the Multics code for that
+environment. I’m a user of that emulation environment, working on
+resurrecting a program for a friend. That code is also on GitHub somewhere.
+
+Answering the second question requires some background. I probably don’t
+know the whole story here (e.g., I don’t know the story of QED on CTSS) and
+that’s why I’ve copied Tom. Here’s what I do know. I distinctly recall
+Robert F. Mabee (Bob) maintaining a version of QED written in BCPL. This
+would be in the ~1969-1971 timeframe. I don’t think he wrote it. I don’t
+know who wrote it, and would be surprised if its source code exists
+anywhere. I don’t think many people used it. It had a reputation of being
+slow and heavy on system resources (CPU and paging). QED was also, at least
+to my college-student eyes, quite baroque in its command set and thus hard
+to learn. BCPL was also not a popular programming language on Multics, so
+few people could fix problems in it or enhance it. Thankfully, Jerry
+Saltzer wrote edm (‘editor for Multics’) as a greatly simplified line
+editor which was much simpler to learn and use, and much leaner on its
+consumption of system resources. In those days, Multics used printing
+terminals at 150-300 baud, and supported a few dozen users in about a
+megabyte of core memory. Compilations of large (several thousand+ lines)
+programs could take many minutes because a CPU heavy user got less CPU time
+than an interactive user.  I don’t recall who wrote qedx as a way of taking
+the power of QED and the efficiency and simplicity of edm, but they did a
+great job. Qedx quickly became the editor of choice, and stayed that way
+until we got display terminals and emacs (written in Lisp, naturally).
+
+So the code in this GitHub archive should probably be called “inspired
+by QED”. I don’t think it is fair to say that it *is* QED. My direct
+knowledge of Multics spans the 1969 to mid-1980. I can’t speak to changes
+to Multics after I left in April, 1980.
+
+In the late 60s and well into the 70s, a printing terminal cost as much
+as a VW bug ($2K). So we didn’t have personal terminals; we had a pool room
+where we shared access to a hodge-podge of various models of printing
+terminals. Smoking was still a thing, and I tended to avoid the times when
+a smoker was present in the terminal room. Honeywell had two terminal
+rooms, and management eventually decreed that one of them was no-smoking,
+which was wonderful. Toward the end of the 1970s, the whole office became
+non-smoking, over many objections.
+
+PG
+---------------------------------------------------
+
+From Tom Van Vleck, October 30, 2024:
+
+The article on QED in https://multicians.org/mgq.html covers the CTSS
+version of QED written by Ken Thompson in about 1965, and its descendants.
+In the 1965-55 time frame, Ken worked for Bell Labs in Murray Hill NJ
+as part of the Multics development team.
+
+To use Ken's CTSS QED, one invoked the command on a BCD file, and then
+issued commands to insert or delete lines, or alter the "current line."
+This QED editor provided a command that let the user specify a text
+sequence with a "regular expression" that could match part of a line,
+and a "substitute" command that could replace the text matching a regular
+expression with new text.
+
+Multics development began at MIT Project MAC in 1965, using CTSS as
+a tool.  One major change from CTSS to Multics was that Multics used the
+ASCII character set, which had upper and lower case letters and more
+punctuation marks than the BCD character set used on CTSS.  CTSS QED
+was enhanced to read ASCII files as well as BCD. Many of the Multics
+developers used QED to write PL/I source.
+
+Ken Thompson wrote a version of his CTSS QED in the BCPL language. (Martin
+Richards visited MIT Project MAC in the mid 60s and ported the Cambridge
+BCPL language to CTSS.)  Bell Labs programmers ported BCPL and the
+BCPL QED to the early Multics as Multics became self-hosting in 1968.
+Bell Labs programmers also wrote roff in bcpl and ported it to Multics.
+
+As Paul mentions, the early versions of Multics had performance problems,
+and using the BCPL version of QED used a lot of resources.  In a brilliant
+solo development, Bob Daley created the QEDX editor for Multics: it was
+a simplification of QED with probably about 80% of the editing commands
+and much better performance.  Multics developers migrated over to qedx
+for most usage.. a few editing features that were omitted from qedx
+were needed by the Multics documentation group, so the BCPL qed was not
+deleted, but was used only in rare cases.
+
+(Bob Daley was one of the principal developers of CTSS, and then became
+the de-facto "chief engineer" for Multics in the 60s. He decided what
+to work on next, what features were in and what were not, who should do
+what, how to trade function for performance.)
+
+Ken's CTSS version of QED was inspired by his
+previous usage of Butler Lampson's Berkeley QED.  See
+https://en.wikipedia.org/wiki/QED_(text_editor) but CTSS and Multics I/O
+was line-at-a-time as opposed to character-at-a-time in the Berkeley
+system and the DEC PDP computers. The line orientation was derived
+from the way that timesharing terminal I/O was implemented, and was not
+changed until the late 70s when Multics support for emacs was created.
+
+On CTSS in the early 60s, the earliest editors, INPUT and EDIT, imitated
+card punching. Users printed out the whole file with line numbers, and
+then edited the file by replacing whole lines.  INPUT and EDIT worked on
+CTSS files in the BCD character set, which had uppercase letters only.
+One breakthrough on CTSS was the 1963 "context editor" CTEST9, created
+by Art Samuel of IBM, which allowed a user to "peek" at the file contents
+while changing it.
+
+Jerry Saltzer wrote a context editor called TYPSET for CTSS in 1964.
+It edited files in the "12-bit" character set, which supported upper and
+lower case letters.  See https://en.wikipedia.org/wiki/TYPSET_and_RUNOFF
+Later, Jerry modified the character I/O routines for TYPSET to create EDM,
+which edited ASCII files.
+
+(Dan Murphy had created the TECO editor for editing paper tape on the
+PDP-1 in 1962.  It had little influence on text editing on CTSS and
+Multics, but was influential on DEC computers and the MIT AI Lab's
+ITS system.)
+
+Hope this helps.
